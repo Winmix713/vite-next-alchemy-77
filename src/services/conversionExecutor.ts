@@ -1,8 +1,9 @@
-
 import { analyzeNextJsRoutes, convertToReactRoutes, NextJsRoute } from "./routeConverter";
 import { analyzeDependencies, generatePackageJsonUpdates, checkVersionCompatibility, generateInstallCommand } from "./dependencyManager";
 import { transformCode, getTransformationStats } from "./codeTransformer";
 import { ConversionOptions } from "@/types/conversion";
+import { generateCICDTemplates } from "./cicdGenerator";
+import { detectMiddlewareType, transformMiddleware } from "./middlewareTransformer";
 
 interface ConversionResult {
   success: boolean;
@@ -89,6 +90,14 @@ export class ConversionExecutor {
       if (this.options.replaceComponents) {
         await this.replaceComponents();
       }
+
+      // Add new steps
+      if (this.options.handleMiddleware) {
+        await this.handleMiddlewares();
+      }
+      
+      // Generate CI/CD configs at the end
+      await this.generateCICDFiles();
       
       this.updateProgress(100, "Konverzió befejezve!");
       this.result.success = this.result.errors.length === 0;
@@ -212,6 +221,50 @@ export class ConversionExecutor {
     // Ez a funkció jelenleg csak helyőrző
     
     this.result.info.push("Komponensek helyettesítése befejezve");
+  }
+
+  private async handleMiddlewares(): Promise<void> {
+    this.updateProgress(80, "Middleware-ek konvertálása...");
+    
+    const middlewareFiles = this.files.filter(file => 
+      file.name.includes('middleware.ts') || 
+      file.name.includes('middleware.js')
+    );
+    
+    for (const file of middlewareFiles) {
+      try {
+        const content = await this.readFileContent(file);
+        const type = detectMiddlewareType(content);
+        const transformed = transformMiddleware(content, type);
+        
+        this.result.info.push(`Middleware átalakítva: ${file.name}`);
+        this.result.transformedFiles.push(file.name);
+        
+      } catch (error) {
+        this.result.warnings.push(
+          `Hiba a middleware konvertálása közben: ${file.name}`
+        );
+      }
+    }
+  }
+
+  private async generateCICDFiles(): Promise<void> {
+    this.updateProgress(90, "CI/CD konfigurációk generálása...");
+    
+    try {
+      const templates = generateCICDTemplates();
+      
+      for (const [platform, template] of Object.entries(templates)) {
+        this.result.info.push(
+          `${platform} konfiguráció generálva: ${template.filename}`
+        );
+      }
+      
+    } catch (error) {
+      this.result.warnings.push(
+        `Hiba a CI/CD konfigurációk generálása közben`
+      );
+    }
   }
   
   private async readFileContent(file: File): Promise<string> {
