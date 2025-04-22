@@ -1,4 +1,3 @@
-
 interface DependencyChange {
   name: string;
   oldVersion?: string;
@@ -24,13 +23,13 @@ const NEXT_ALTERNATIVES: DependencyAlternative[] = [
   },
   {
     original: 'next/image',
-    replacement: 'vite-plugin-image-presets',
+    replacement: '@unpic/react',
     replacementVersion: 'latest',
-    reason: 'Next.js kép optimalizáció helyett Vite-kompatibilis kép optimalizáció'
+    reason: 'Next.js Image komponens helyett optimalizált React képkezelő'
   },
   {
     original: 'next/font',
-    replacement: '@fontsource/roboto', // példa
+    replacement: '@fontsource/inter',
     replacementVersion: 'latest',
     reason: 'Next.js font kezelés helyett standard font betöltés'
   },
@@ -48,9 +47,15 @@ const NEXT_ALTERNATIVES: DependencyAlternative[] = [
   },
   {
     original: 'next-themes',
-    replacement: 'next-themes', // ez a csomag valójában Vite-tal is működik
-    replacementVersion: '', // megtartjuk a jelenlegi verziót
-    reason: 'Téma kezelés, ez a csomag Vite-tal is kompatibilis'
+    replacement: '@theme-toggles/react',
+    replacementVersion: 'latest',
+    reason: 'Téma kezelés Vite környezetben'
+  },
+  {
+    original: 'next/navigation',
+    replacement: 'react-router-dom',
+    replacementVersion: 'latest',
+    reason: 'Next.js navigáció helyett React Router'
   }
 ];
 
@@ -242,4 +247,45 @@ export function checkVersionCompatibility(changes: DependencyChange[]): {
     compatible: issues.length === 0,
     issues
   };
+}
+
+export function validatePackageJson(packageJson: any): {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+} {
+  const result = {
+    isValid: true,
+    errors: [] as string[],
+    warnings: [] as string[]
+  };
+
+  // Kötelező mezők ellenőrzése
+  if (!packageJson.name) {
+    result.errors.push('Missing package name');
+    result.isValid = false;
+  }
+
+  if (!packageJson.version) {
+    result.errors.push('Missing package version');
+    result.isValid = false;
+  }
+
+  // React verzió ellenőrzése
+  if (packageJson.dependencies?.react) {
+    const reactVersion = packageJson.dependencies.react;
+    if (!reactVersion.startsWith('^18') && !reactVersion.startsWith('18')) {
+      result.warnings.push('React version should be 18 or higher for Vite compatibility');
+    }
+  }
+
+  // TypeScript verzió ellenőrzése
+  if (packageJson.devDependencies?.typescript) {
+    const tsVersion = packageJson.devDependencies.typescript;
+    if (parseInt(tsVersion) < 4.3) {
+      result.warnings.push('TypeScript version should be 4.3 or higher for Vite compatibility');
+    }
+  }
+
+  return result;
 }

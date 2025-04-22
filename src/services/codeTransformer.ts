@@ -1,4 +1,3 @@
-
 interface TransformationRule {
   pattern: RegExp;
   replacement: string | ((match: string, ...args: any[]) => string);
@@ -132,20 +131,38 @@ export const getAvailablePaths = async () => {
   // Next.js Dynamic import átalakítás
   {
     pattern: /import\s+dynamic\s+from\s+['"]next\/dynamic['"]/g,
-    replacement: "import { lazy } from 'react'",
+    replacement: "import { lazy, Suspense } from 'react'",
     description: "Replace Next.js dynamic with React.lazy",
     complexity: 'simple'
   },
   {
-    pattern: /const\s+(\w+)\s*=\s*dynamic\(\s*\(\)\s*=>\s*import\((['"`][^'"`]+['"`])\)(?:,\s*{\s*loading:\s*([^}]+)\s*})?\)/g,
-    replacement: (match, componentName, importPath, loadingComponent) => {
-      const lazyComponent = `const ${componentName} = lazy(() => import(${importPath}))`;
-      if (loadingComponent) {
-        return `${lazyComponent}\n// Don't forget to wrap with <Suspense fallback={<${loadingComponent} />}>`;
-      }
-      return `${lazyComponent}\n// Don't forget to wrap with <Suspense fallback={<div>Loading...</div>}>`;
-    },
-    description: "Convert Next.js dynamic imports to React.lazy",
+    pattern: /const\s+(\w+)\s*=\s*dynamic\(\s*\(\)\s*=>\s*import\(['"]([^'"]+)['"]\)\)/g,
+    replacement: "const $1 = lazy(() => import('$2'))",
+    description: "Convert dynamic import syntax",
+    complexity: 'medium'
+  },
+  {
+    pattern: /import\s+{\s*useRouter\s*}\s+from\s+['"]next\/router['"]/g,
+    replacement: "import { useNavigate, useParams, useLocation } from 'react-router-dom'",
+    description: "Replace Next.js router with React Router",
+    complexity: 'simple'
+  },
+  {
+    pattern: /const\s+router\s*=\s*useRouter\(\)/g,
+    replacement: "const navigate = useNavigate()\nconst params = useParams()\nconst location = useLocation()",
+    description: "Convert router hooks",
+    complexity: 'medium'
+  },
+  {
+    pattern: /import\s+Image\s+from\s+['"]next\/image['"]/g,
+    replacement: "import { Image } from '@unpic/react'",
+    description: "Replace Next.js Image with @unpic/react",
+    complexity: 'simple'
+  },
+  {
+    pattern: /<Image\s+([^>]*)src=(['"])(.*?)\2([^>]*)>/g,
+    replacement: "<Image $1src={$2$3$2} layout='fill' $4>",
+    description: "Convert Image component props",
     complexity: 'complex'
   },
 
@@ -183,7 +200,6 @@ export function transformCode(sourceCode: string): {
 
   for (const rule of nextToViteTransformations) {
     if (rule.pattern.test(transformedCode)) {
-      // Fix the type issue by properly handling the replacement type
       if (typeof rule.replacement === 'string') {
         transformedCode = transformedCode.replace(rule.pattern, rule.replacement);
       } else if (typeof rule.replacement === 'function') {
