@@ -22,6 +22,19 @@ interface WebVitalsMetrics {
   fcp: number; // First Contentful Paint
 }
 
+// PerformanceMemory interfész a Chrome Performance API kiegészítésére
+interface PerformanceMemory {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
+// A Performance interfész kiterjesztése a memory tulajdonsággal
+// Ez csak Chrome-specifikus funkció
+interface ExtendedPerformance extends Performance {
+  memory?: PerformanceMemory;
+}
+
 /**
  * Teljesítmény monitorozás a konvertált alkalmazások számára
  */
@@ -182,10 +195,13 @@ ${this.metrics.loadTime ? `
    * Snapshot készítése az aktuális memóriahasználatról (csak ha a környezet támogatja)
    */
   captureMemoryUsage(): void {
-    if (typeof performance !== 'undefined' && performance.memory) {
-      // Csak Chrome-ban támogatott
-      this.metrics.memoryUsage = performance.memory.usedJSHeapSize;
-      console.log(`Memóriahasználat: ${this.formatBytes(this.metrics.memoryUsage)}`);
+    if (typeof performance !== 'undefined') {
+      // Kiterjesztett Performance interfész használata Chrome esetén
+      const extendedPerf = performance as ExtendedPerformance;
+      if (extendedPerf.memory) {
+        this.metrics.memoryUsage = extendedPerf.memory.usedJSHeapSize;
+        console.log(`Memóriahasználat: ${this.formatBytes(this.metrics.memoryUsage)}`);
+      }
     }
   }
 }

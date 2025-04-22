@@ -4,6 +4,7 @@ import ProjectStats from "./dashboard/ProjectStats";
 import ConversionOptions from "./dashboard/ConversionOptions";
 import CodePreviewTabs from "./dashboard/CodePreviewTabs";
 import ConversionProgress from "./dashboard/ConversionProgress";
+import { ConversionOptions as ConversionOptionsType } from "@/types/conversion";
 
 interface ConversionDashboardProps {
   projectData: any;
@@ -16,17 +17,17 @@ const ConversionDashboard = ({
   onStartConversion,
   isConverting 
 }: ConversionDashboardProps) => {
-  const [options, setOptions] = useState({
+  const [options, setOptions] = useState<ConversionOptionsType>({
     useReactRouter: true,
     convertApiRoutes: true,
     transformDataFetching: true,
     replaceComponents: true,
     updateDependencies: true,
     preserveTypeScript: true,
-    handleMiddleware: true // új opció hozzáadva
+    handleMiddleware: true
   });
 
-  const toggleOption = (option: keyof typeof options) => {
+  const toggleOption = (option: keyof ConversionOptionsType) => {
     setOptions({ ...options, [option]: !options[option] });
   };
 

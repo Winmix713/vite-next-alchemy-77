@@ -45,7 +45,7 @@ export class DiagnosticsReporter {
   /**
    * Hibák hozzáadása a jelentéshez
    */
-  addError(message: string, options?: Partial<DiagnosticError>): void {
+  addError(message: string, options?: Partial<DiagnosticError>): DiagnosticError {
     const error: DiagnosticError = {
       id: this.generateId(),
       timestamp: Date.now(),
@@ -68,7 +68,7 @@ export class DiagnosticsReporter {
   /**
    * Figyelmeztetések hozzáadása a jelentéshez
    */
-  addWarning(message: string, options?: Partial<DiagnosticError>): void {
+  addWarning(message: string, options?: Partial<DiagnosticError>): DiagnosticError {
     const warning: DiagnosticError = {
       id: this.generateId(),
       timestamp: Date.now(),
@@ -91,7 +91,7 @@ export class DiagnosticsReporter {
   /**
    * Információk hozzáadása a jelentéshez
    */
-  addInfo(message: string, options?: Partial<DiagnosticError>): void {
+  addInfo(message: string, options?: Partial<DiagnosticError>): DiagnosticError {
     const info: DiagnosticError = {
       id: this.generateId(),
       timestamp: Date.now(),
