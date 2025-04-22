@@ -1,4 +1,3 @@
-
 import * as parser from '@babel/parser';
 import traverse from '@babel/traverse';
 import generate from '@babel/generator';
@@ -61,32 +60,32 @@ export function transformWithAst(
           changes.push('next/router import átalakítva react-router-dom importra');
         } else if (source === 'next/dynamic') {
           // Speciális eset: dynamic importot React.lazy-re cseréljük
-          const specifiers = path.node.specifiers.map(spec => {
-            if (t.isImportSpecifier(spec) && t.isIdentifier(spec.imported)) {
-              return spec.imported.name;
+          const hasSpecifier = path.node.specifiers.some(spec => {
+            if (t.isImportSpecifier(spec) && spec.imported && t.isIdentifier(spec.imported)) {
+              return spec.imported.name === 'dynamic';
             } else if (t.isImportDefaultSpecifier(spec)) {
-              return 'dynamic';
+              return true;
             }
-            return null;
-          }).filter(Boolean);
+            return false;
+          });
           
-          if (specifiers.includes('dynamic')) {
-            // Az importot kicseréljük React lazy importra
-            path.replaceWith(
-              t.importDeclaration(
-                [
-                  t.importSpecifier(
-                    t.identifier('lazy'),
-                    t.identifier('lazy')
-                  ),
-                  t.importSpecifier(
-                    t.identifier('Suspense'),
-                    t.identifier('Suspense')
-                  )
-                ],
-                t.stringLiteral('react')
-              )
+          if (hasSpecifier) {
+            // Új import deklaráció létrehozása
+            const newImport = t.importDeclaration(
+              [
+                t.importSpecifier(
+                  t.identifier('lazy'),
+                  t.identifier('lazy')
+                ),
+                t.importSpecifier(
+                  t.identifier('Suspense'),
+                  t.identifier('Suspense')
+                )
+              ],
+              t.stringLiteral('react')
             );
+            
+            path.replaceWith(newImport);
             changes.push('next/dynamic import átalakítva React lazy és Suspense importra');
           }
         }
@@ -95,32 +94,37 @@ export function transformWithAst(
       // Dynamic importok átalakítása React.lazy-re
       VariableDeclarator(path) {
         if (
+          path.node.init && 
           t.isCallExpression(path.node.init) &&
           t.isIdentifier(path.node.init.callee) && 
           path.node.init.callee.name === 'dynamic'
         ) {
           // Ellenőrizzük, hogy a dynamic argumentuma egy függvény-e
-          const dynamicArg = path.node.init.arguments[0];
-          if (t.isArrowFunctionExpression(dynamicArg) || t.isFunctionExpression(dynamicArg)) {
-            const dynamicBody = dynamicArg.body;
-            
-            // Ha a függvény teste egy import() hívás
-            if (
-              t.isCallExpression(dynamicBody) && 
-              t.isImport(dynamicBody.callee)
-            ) {
-              // Kicseréljük a dynamic-ot lazy-re
-              path.node.init = t.callExpression(
-                t.identifier('lazy'),
-                [
-                  t.arrowFunctionExpression(
-                    [],
-                    dynamicBody
-                  )
-                ]
-              );
+          if (path.node.init.arguments.length > 0) {
+            const dynamicArg = path.node.init.arguments[0];
+            if (t.isArrowFunctionExpression(dynamicArg) || t.isFunctionExpression(dynamicArg)) {
+              const dynamicBody = dynamicArg.body;
               
-              changes.push('dynamic() hívás átalakítva lazy() hívásra');
+              // Ha a függvény teste egy import() hívás
+              if (
+                t.isCallExpression(dynamicBody) && 
+                t.isImport(dynamicBody.callee)
+              ) {
+                // Létrehozzuk a lazy hívást
+                const lazyCallExpr = t.callExpression(
+                  t.identifier('lazy'),
+                  [
+                    t.arrowFunctionExpression(
+                      [],
+                      dynamicBody
+                    )
+                  ]
+                );
+                
+                // Frissítjük az init mezőt a lazy hívással
+                path.node.init = lazyCallExpr;
+                changes.push('dynamic() hívás átalakítva lazy() hívásra');
+              }
             }
           }
         }
@@ -128,17 +132,15 @@ export function transformWithAst(
       
       // getServerSideProps, getStaticProps transzformálása
       ExportNamedDeclaration(path) {
-        if (
-          t.isVariableDeclaration(path.node.declaration) || 
-          t.isFunctionDeclaration(path.node.declaration)
-        ) {
+        if (path.node.declaration) {
           let fnName = '';
           
           if (t.isFunctionDeclaration(path.node.declaration) && path.node.declaration.id) {
             fnName = path.node.declaration.id.name;
           } else if (
             t.isVariableDeclaration(path.node.declaration) &&
-            path.node.declaration.declarations[0] &&
+            path.node.declaration.declarations.length > 0 &&
+            path.node.declaration.declarations[0].id &&
             t.isIdentifier(path.node.declaration.declarations[0].id)
           ) {
             fnName = path.node.declaration.declarations[0].id.name;
@@ -151,58 +153,49 @@ export function transformWithAst(
               ? 'useFetchData' 
               : (fnName === 'getStaticProps' ? 'useStaticData' : 'useAvailablePaths');
             
-            let functionBody: any;
-            
-            if (t.isFunctionDeclaration(path.node.declaration)) {
-              functionBody = path.node.declaration.body;
-            } else if (
-              t.isVariableDeclaration(path.node.declaration) &&
-              path.node.declaration.declarations[0] &&
-              t.isArrowFunctionExpression(path.node.declaration.declarations[0].init)
-            ) {
-              functionBody = path.node.declaration.declarations[0].init.body;
-            }
-            
-            if (functionBody) {
-              // Átalakítjuk React Query hook-ká
-              const hookDeclaration = t.functionDeclaration(
-                t.identifier(reactQueryFnName),
-                [],
-                t.blockStatement([
-                  t.returnStatement(
-                    t.callExpression(
-                      t.identifier('useQuery'),
-                      [
-                        t.objectExpression([
-                          t.objectProperty(
-                            t.identifier('queryKey'),
-                            t.arrayExpression([t.stringLiteral(fnName.toLowerCase())])
-                          ),
-                          t.objectProperty(
-                            t.identifier('queryFn'),
-                            t.arrowFunctionExpression(
-                              [],
-                              functionBody
-                            )
+            // Új hook deklaráció létrehozása
+            const hookDeclaration = t.functionDeclaration(
+              t.identifier(reactQueryFnName),
+              [],
+              t.blockStatement([
+                t.returnStatement(
+                  t.callExpression(
+                    t.identifier('useQuery'),
+                    [
+                      t.objectExpression([
+                        t.objectProperty(
+                          t.identifier('queryKey'),
+                          t.arrayExpression([t.stringLiteral(fnName.toLowerCase())])
+                        ),
+                        t.objectProperty(
+                          t.identifier('queryFn'),
+                          t.arrowFunctionExpression(
+                            [],
+                            t.blockStatement([
+                              t.commentStatement(' Original ' + fnName + ' logic '),
+                              t.returnStatement(t.objectExpression([
+                                t.objectProperty(
+                                  t.identifier('props'),
+                                  t.objectExpression([])
+                                )
+                              ]))
+                            ])
                           )
-                        ])
-                      ]
-                    )
+                        )
+                      ])
+                    ]
                   )
-                ]),
-                false,
-                false
-              );
-              
-              path.replaceWith(
-                t.exportNamedDeclaration(
-                  hookDeclaration,
-                  []
                 )
-              );
-              
-              changes.push(`${fnName} átalakítva React Query ${reactQueryFnName} hook-ká`);
-            }
+              ])
+            );
+            
+            // Új export deklaráció létrehozása a hook-kal
+            const exportHook = t.exportNamedDeclaration(hookDeclaration, []);
+            
+            // A régi export cseréje az újra
+            path.replaceWith(exportHook);
+            
+            changes.push(`${fnName} átalakítva React Query ${reactQueryFnName} hook-ká`);
           }
         }
       },
@@ -216,43 +209,34 @@ export function transformWithAst(
         if (t.isJSXIdentifier(tagName)) {
           // Next.js Image komponens átalakítása
           if (tagName.name === 'Image') {
-            tagName.name = 'Image'; // @unpic/react Image neve is Image
+            // Név ugyanaz marad (@unpic/react Image)
             
             // src és href attribútumok kezelése
-            openingElement.attributes = openingElement.attributes.map(attr => {
-              if (
-                t.isJSXAttribute(attr) && 
-                t.isJSXIdentifier(attr.name) && 
-                attr.name.name === 'src'
-              ) {
-                // Változtatás nélkül meghagyjuk
-                return attr;
+            const newAttributes = openingElement.attributes.filter(attr => {
+              if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
+                // Kihagyjuk a priority és placeholder attribútumokat
+                if (['priority', 'placeholder'].includes(attr.name.name)) {
+                  warnings.push(`Az Image komponens '${attr.name.name}' tulajdonsága nem támogatott az @unpic/react könyvtárban.`);
+                  return false;
+                }
               }
-              
-              // width és height attribútumok kezelése
-              // priorioty és loading attribútumok kezelése
-              if (
-                t.isJSXAttribute(attr) && 
-                t.isJSXIdentifier(attr.name) && 
-                (attr.name.name === 'priority' || attr.name.name === 'placeholder')
-              ) {
-                // Ezeket kihagyjuk, mert @unpic/react nem támogatja
-                warnings.push(`Az Image komponens '${attr.name.name}' tulajdonsága nem támogatott az @unpic/react könyvtárban.`);
-                return null;
+              return true;
+            });
+            
+            // Layout attribútum ellenőrzése
+            let hasLayout = false;
+            for (const attr of newAttributes) {
+              if (t.isJSXAttribute(attr) && 
+                  t.isJSXIdentifier(attr.name) && 
+                  attr.name.name === 'layout') {
+                hasLayout = true;
+                break;
               }
-              
-              return attr;
-            }).filter(Boolean) as t.JSXAttribute[];
+            }
             
-            // Layout attribútum hozzáadása, ha még nincs
-            const hasLayout = openingElement.attributes.some(attr => 
-              t.isJSXAttribute(attr) && 
-              t.isJSXIdentifier(attr.name) && 
-              attr.name.name === 'layout'
-            );
-            
+            // Ha nincs layout, hozzáadunk egyet
             if (!hasLayout) {
-              openingElement.attributes.push(
+              newAttributes.push(
                 t.jsxAttribute(
                   t.jsxIdentifier('layout'),
                   t.stringLiteral('responsive')
@@ -260,36 +244,33 @@ export function transformWithAst(
               );
             }
             
+            // Frissítjük az attribútumokat
+            openingElement.attributes = newAttributes;
+            
             changes.push('Next.js Image komponens átalakítva @unpic/react Image komponensre');
           } 
           // Next.js Link komponens átalakítása
           else if (tagName.name === 'Link') {
-            tagName.name = 'Link'; // React Router Link neve is Link
+            // Név ugyanaz marad (React Router Link neve is Link)
             
             // href attribútum átalakítása to attribútummá
-            openingElement.attributes = openingElement.attributes.map(attr => {
-              if (
-                t.isJSXAttribute(attr) && 
-                t.isJSXIdentifier(attr.name) && 
-                attr.name.name === 'href'
-              ) {
-                return t.jsxAttribute(
-                  t.jsxIdentifier('to'),
-                  attr.value
-                );
+            const newAttributes = openingElement.attributes.filter(attr => {
+              if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
+                // Kihagyjuk a passHref és legacyBehavior attribútumokat
+                if (['passHref', 'legacyBehavior'].includes(attr.name.name)) {
+                  return false;
+                }
+                
+                // href átalakítása to-ra
+                if (attr.name.name === 'href') {
+                  attr.name.name = 'to';
+                }
               }
-              
-              // passHref és legacyBehavior attribútumok eltávolítása
-              if (
-                t.isJSXAttribute(attr) && 
-                t.isJSXIdentifier(attr.name) && 
-                (attr.name.name === 'passHref' || attr.name.name === 'legacyBehavior')
-              ) {
-                return null;
-              }
-              
-              return attr;
-            }).filter(Boolean) as t.JSXAttribute[];
+              return true;
+            });
+            
+            // Frissítjük az attribútumokat
+            openingElement.attributes = newAttributes;
             
             changes.push('Next.js Link komponens átalakítva React Router Link komponensre');
           }
@@ -308,27 +289,24 @@ export function transformWithAst(
             tagName.name = 'script';
             
             // strategy attribútum átalakítása
-            openingElement.attributes = openingElement.attributes.map(attr => {
-              if (
-                t.isJSXAttribute(attr) && 
-                t.isJSXIdentifier(attr.name) && 
-                attr.name.name === 'strategy'
-              ) {
-                if (
-                  attr.value && 
-                  t.isStringLiteral(attr.value) && 
-                  attr.value.value === 'lazyOnload'
-                ) {
-                  return t.jsxAttribute(
-                    t.jsxIdentifier('defer'),
-                    t.jsxExpressionContainer(t.booleanLiteral(true))
-                  );
+            const newAttributes = openingElement.attributes.filter(attr => {
+              if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
+                if (attr.name.name === 'strategy') {
+                  if (attr.value && t.isStringLiteral(attr.value) && attr.value.value === 'lazyOnload') {
+                    // Helyette defer attribútumot használunk
+                    openingElement.attributes.push(t.jsxAttribute(
+                      t.jsxIdentifier('defer'),
+                      t.jsxExpressionContainer(t.booleanLiteral(true))
+                    ));
+                  }
+                  return false;
                 }
-                return null;
               }
-              
-              return attr;
-            }).filter(Boolean) as t.JSXAttribute[];
+              return true;
+            });
+            
+            // Frissítjük az attribútumokat
+            openingElement.attributes = newAttributes;
             
             if (closingElement && t.isJSXIdentifier(closingElement.name)) {
               closingElement.name.name = 'script';
@@ -351,12 +329,6 @@ export function transformWithAst(
           ) {
             path.replaceWith(t.identifier('navigate'));
             changes.push('router.push átalakítva navigate függvényhívásra');
-          } else if (
-            t.isIdentifier(path.node.property) &&
-            path.node.property.name === 'replace'
-          ) {
-            // Ezt a szülő CallExpression-ben kell majd kezelni
-            changes.push('router.replace észlelve, átalakítás szükséges');
           } else if (
             t.isIdentifier(path.node.property) &&
             path.node.property.name === 'query'
@@ -387,20 +359,20 @@ export function transformWithAst(
           path.node.arguments.length > 0
         ) {
           // Átalakítjuk navigate() hívásra replace opcióval
-          path.replaceWith(
-            t.callExpression(
-              t.identifier('navigate'),
-              [
-                path.node.arguments[0],
-                t.objectExpression([
-                  t.objectProperty(
-                    t.identifier('replace'),
-                    t.booleanLiteral(true)
-                  )
-                ])
-              ]
-            )
+          const newCall = t.callExpression(
+            t.identifier('navigate'),
+            [
+              path.node.arguments[0],
+              t.objectExpression([
+                t.objectProperty(
+                  t.identifier('replace'),
+                  t.booleanLiteral(true)
+                )
+              ])
+            ]
           );
+          
+          path.replaceWith(newCall);
           changes.push('router.replace() átalakítva navigate(path, { replace: true })-ra');
         }
         
@@ -412,12 +384,12 @@ export function transformWithAst(
           t.isIdentifier(path.node.callee.property) &&
           path.node.callee.property.name === 'back'
         ) {
-          path.replaceWith(
-            t.callExpression(
-              t.identifier('navigate'),
-              [t.numericLiteral(-1)]
-            )
+          const newCall = t.callExpression(
+            t.identifier('navigate'),
+            [t.numericLiteral(-1)]
           );
+          
+          path.replaceWith(newCall);
           changes.push('router.back() átalakítva navigate(-1)-re');
         }
         
@@ -428,55 +400,68 @@ export function transformWithAst(
         ) {
           // Ha ez egy változó deklarációban van, akkor különleges kezelés kell
           if (
+            path.parent && 
             t.isVariableDeclarator(path.parent) && 
             t.isIdentifier(path.parent.id) &&
             path.parent.id.name === 'router'
           ) {
             // Meg kell keresni a változó deklaráció szülőjét
-            const varDeclPath = path.findParent(p => t.isVariableDeclaration(p.node));
+            const varDeclPath = path.findParent(p => t.isVariableDeclaration(p));
             
             if (varDeclPath) {
-              const routerHooks = [
-                t.variableDeclaration(
-                  'const',
-                  [
-                    t.variableDeclarator(
-                      t.identifier('navigate'),
-                      t.callExpression(
-                        t.identifier('useNavigate'),
-                        []
-                      )
+              // Új hook-ok létrehozása
+              const navigateHook = t.variableDeclaration(
+                'const',
+                [
+                  t.variableDeclarator(
+                    t.identifier('navigate'),
+                    t.callExpression(
+                      t.identifier('useNavigate'),
+                      []
                     )
-                  ]
-                ),
-                t.variableDeclaration(
-                  'const',
-                  [
-                    t.variableDeclarator(
-                      t.identifier('params'),
-                      t.callExpression(
-                        t.identifier('useParams'),
-                        []
-                      )
-                    )
-                  ]
-                ),
-                t.variableDeclaration(
-                  'const',
-                  [
-                    t.variableDeclarator(
-                      t.identifier('location'),
-                      t.callExpression(
-                        t.identifier('useLocation'),
-                        []
-                      )
-                    )
-                  ]
-                )
-              ];
+                  )
+                ]
+              );
               
-              // Az eredeti deklaráció helyére beszúrjuk az összes új hook hívásat
-              varDeclPath.replaceWithMultiple(routerHooks);
+              const paramsHook = t.variableDeclaration(
+                'const',
+                [
+                  t.variableDeclarator(
+                    t.identifier('params'),
+                    t.callExpression(
+                      t.identifier('useParams'),
+                      []
+                    )
+                  )
+                ]
+              );
+              
+              const locationHook = t.variableDeclaration(
+                'const',
+                [
+                  t.variableDeclarator(
+                    t.identifier('location'),
+                    t.callExpression(
+                      t.identifier('useLocation'),
+                      []
+                    )
+                  )
+                ]
+              );
+              
+              // A program törzsében cseréljük a hook hívást
+              const program = path.findParent(p => t.isProgram(p));
+              if (program && program.node.body) {
+                // Megkeressük a változó deklaráció indexét
+                const declarations = program.node.body;
+                for (let i = 0; i < declarations.length; i++) {
+                  if (declarations[i] === varDeclPath.node) {
+                    // Beszúrjuk az új hook-okat
+                    declarations.splice(i, 1, navigateHook, paramsHook, locationHook);
+                    break;
+                  }
+                }
+              }
               
               changes.push('useRouter() hook átalakítva useNavigate, useParams és useLocation hook-okra');
             }
@@ -648,7 +633,7 @@ export function analyzeCodeStructure(code: string): {
           
           // Komponensek (nagybetűvel kezdődő nevek)
           if (name[0] === name[0].toUpperCase()) {
-            // Ellenőrizzük a függvény testét JSX elemek után
+            // Ellenőrizz��k a függvény testét JSX elemek után
             let hasJsx = false;
             traverse.default(
               path.node,

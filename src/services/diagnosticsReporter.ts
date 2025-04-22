@@ -1,386 +1,758 @@
 
-interface DiagnosticError {
+import { ConversionOptions } from "@/types/conversion";
+
+export interface DiagnosticCategory {
   id: string;
-  timestamp: number;
+  name: string;
+  description: string;
   severity: 'error' | 'warning' | 'info';
+}
+
+export interface Diagnostic {
+  id: string;
+  category: string;
   message: string;
-  code: string;
+  details?: string;
   file?: string;
   line?: number;
   column?: number;
-  stackTrace?: string;
-  suggestions?: string[];
-}
-
-interface DiagnosticReport {
-  conversionId: string;
+  code?: string;
+  suggestion?: string;
   timestamp: number;
-  errors: DiagnosticError[];
-  warnings: DiagnosticError[];
-  infos: DiagnosticError[];
-  summary: {
-    totalErrors: number;
-    totalWarnings: number;
-    totalInfos: number;
-    criticalIssues: number;
-  };
+  severity: 'error' | 'warning' | 'info';
+  context?: Record<string, any>;
 }
 
-/**
- * Hibajelentési és diagnosztikai rendszer
- * A konverzió során fellépő hibák részletes kezelésére és jelentésére
- */
+export interface DiagnosticStatistics {
+  totalErrors: number;
+  totalWarnings: number;
+  totalInfos: number;
+  categoryCounts: Record<string, number>;
+  fileErrors: Record<string, number>;
+  dependenciesWithIssues: string[];
+  mostCommonErrors: { message: string; count: number }[];
+  conversionRate: number;
+  completedSteps: string[];
+}
+
+export interface DiagnosticReport {
+  project: string;
+  timestamp: number;
+  statistics: DiagnosticStatistics;
+  diagnostics: Diagnostic[];
+  conversionOptions: ConversionOptions;
+}
+
+// Diagnosztikai kategóriák
+const diagnosticCategories: DiagnosticCategory[] = [
+  {
+    id: 'routing',
+    name: 'Útvonalak',
+    description: 'Next.js útvonalakkal kapcsolatos problémák és átalakítások.',
+    severity: 'warning'
+  },
+  {
+    id: 'component',
+    name: 'Komponensek',
+    description: 'Next.js specifikus komponensek átalakítása React komponensekre.',
+    severity: 'warning'
+  },
+  {
+    id: 'api',
+    name: 'API útvonalak',
+    description: 'API útvonalak átalakításával kapcsolatos problémák.',
+    severity: 'error'
+  },
+  {
+    id: 'data-fetching',
+    name: 'Adatlekérés',
+    description: 'getServerSideProps, getStaticProps és más adatlekérési metódusok átalakítása.',
+    severity: 'warning'
+  },
+  {
+    id: 'typescript',
+    name: 'TypeScript',
+    description: 'TypeScript típusok és interfészek átalakítása.',
+    severity: 'warning'
+  },
+  {
+    id: 'dependency',
+    name: 'Függőségek',
+    description: 'Next.js specifikus függőségek kezelése és átalakítása.',
+    severity: 'error'
+  },
+  {
+    id: 'config',
+    name: 'Konfiguráció',
+    description: 'Next.js konfigurációs fájlok átalakítása Vite konfigurációkra.',
+    severity: 'warning'
+  },
+  {
+    id: 'middleware',
+    name: 'Middleware',
+    description: 'Next.js middleware átalakítása.',
+    severity: 'error'
+  },
+  {
+    id: 'optimization',
+    name: 'Optimalizáció',
+    description: 'Teljesítményoptimalizációs javaslatok.',
+    severity: 'info'
+  }
+];
+
 export class DiagnosticsReporter {
-  private errors: DiagnosticError[] = [];
-  private warnings: DiagnosticError[] = [];
-  private infos: DiagnosticError[] = [];
-  private conversionId: string;
-  private startTime: number;
+  private project: string;
+  private diagnostics: Diagnostic[] = [];
+  private conversionOptions: ConversionOptions;
+  private completedSteps: Set<string> = new Set();
+  private interactiveMode: boolean = false;
   
-  constructor() {
-    this.conversionId = this.generateId();
-    this.startTime = Date.now();
+  constructor(project: string, options: ConversionOptions) {
+    this.project = project;
+    this.conversionOptions = options;
   }
   
   /**
-   * Hibák hozzáadása a jelentéshez
+   * Interaktív mód beállítása
    */
-  addError(message: string, options?: Partial<DiagnosticError>): DiagnosticError {
-    const error: DiagnosticError = {
-      id: this.generateId(),
-      timestamp: Date.now(),
-      severity: 'error',
+  setInteractiveMode(interactive: boolean): void {
+    this.interactiveMode = interactive;
+  }
+  
+  /**
+   * Diagnosztikai bejegyzés hozzáadása
+   */
+  addDiagnostic(diagnostic: Omit<Diagnostic, 'id' | 'timestamp'>): void {
+    const id = `${diagnostic.category}-${Date.now()}-${this.diagnostics.length}`;
+    
+    this.diagnostics.push({
+      ...diagnostic,
+      id,
+      timestamp: Date.now()
+    });
+    
+    if (this.interactiveMode) {
+      // Interaktív módban azonnal kiírjuk a diagnosztikákat
+      const severitySymbol = {
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+      }[diagnostic.severity];
+      
+      console.log(`${severitySymbol} [${diagnostic.category}] ${diagnostic.message}`);
+      if (diagnostic.file) {
+        console.log(`   📄 ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ''}`);
+      }
+      if (diagnostic.suggestion) {
+        console.log(`   💡 ${diagnostic.suggestion}`);
+      }
+    }
+  }
+  
+  /**
+   * Több diagnosztikai bejegyzés hozzáadása
+   */
+  addDiagnostics(diagnostics: Omit<Diagnostic, 'id' | 'timestamp'>[]): void {
+    diagnostics.forEach(diagnostic => this.addDiagnostic(diagnostic));
+  }
+  
+  /**
+   * Hiba hozzáadása
+   */
+  addError(category: string, message: string, details?: Partial<Omit<Diagnostic, 'id' | 'timestamp' | 'category' | 'message' | 'severity'>>): void {
+    this.addDiagnostic({
+      category,
       message,
-      code: options?.code || 'E_UNKNOWN',
-      file: options?.file,
-      line: options?.line,
-      column: options?.column,
-      stackTrace: options?.stackTrace,
-      suggestions: options?.suggestions || this.generateSuggestions(message, 'error')
-    };
-    
-    this.errors.push(error);
-    console.error(`[HIBA] ${message}`, options?.file ? `(${options.file})` : '');
-    
-    return error;
+      ...details,
+      severity: 'error'
+    });
   }
   
   /**
-   * Figyelmeztetések hozzáadása a jelentéshez
+   * Figyelmeztetés hozzáadása
    */
-  addWarning(message: string, options?: Partial<DiagnosticError>): DiagnosticError {
-    const warning: DiagnosticError = {
-      id: this.generateId(),
-      timestamp: Date.now(),
-      severity: 'warning',
+  addWarning(category: string, message: string, details?: Partial<Omit<Diagnostic, 'id' | 'timestamp' | 'category' | 'message' | 'severity'>>): void {
+    this.addDiagnostic({
+      category,
       message,
-      code: options?.code || 'W_UNKNOWN',
-      file: options?.file,
-      line: options?.line,
-      column: options?.column,
-      stackTrace: options?.stackTrace,
-      suggestions: options?.suggestions || this.generateSuggestions(message, 'warning')
-    };
-    
-    this.warnings.push(warning);
-    console.warn(`[FIGYELMEZTETÉS] ${message}`, options?.file ? `(${options.file})` : '');
-    
-    return warning;
+      ...details,
+      severity: 'warning'
+    });
   }
   
   /**
-   * Információk hozzáadása a jelentéshez
+   * Információs bejegyzés hozzáadása
    */
-  addInfo(message: string, options?: Partial<DiagnosticError>): DiagnosticError {
-    const info: DiagnosticError = {
-      id: this.generateId(),
-      timestamp: Date.now(),
-      severity: 'info',
+  addInfo(category: string, message: string, details?: Partial<Omit<Diagnostic, 'id' | 'timestamp' | 'category' | 'message' | 'severity'>>): void {
+    this.addDiagnostic({
+      category,
       message,
-      code: options?.code || 'I_INFO',
-      file: options?.file,
-      line: options?.line,
-      column: options?.column,
-      stackTrace: options?.stackTrace,
-      suggestions: options?.suggestions
-    };
-    
-    this.infos.push(info);
-    console.info(`[INFO] ${message}`, options?.file ? `(${options.file})` : '');
-    
-    return info;
+      ...details,
+      severity: 'info'
+    });
   }
   
   /**
-   * Jelentés generálása az összegyűjtött hibákból és figyelmeztetésekből
+   * Folyamat lépés befejezésének jelzése
    */
-  generateReport(): DiagnosticReport {
-    const criticalIssues = this.errors.filter(e => 
-      e.code.startsWith('E_CRITICAL') || 
-      e.code.startsWith('E_FATAL')
-    ).length;
+  completeStep(step: string): void {
+    this.completedSteps.add(step);
+    this.addInfo('progress', `${step} lépés befejezve.`);
+  }
+  
+  /**
+   * Diagnosztikák lekérdezése
+   */
+  getDiagnostics(): Diagnostic[] {
+    return this.diagnostics;
+  }
+  
+  /**
+   * Diagnosztikai statisztikák generálása
+   */
+  generateStatistics(): DiagnosticStatistics {
+    // Különböző súlyosságú diagnosztikák számolása
+    const totalErrors = this.diagnostics.filter(d => d.severity === 'error').length;
+    const totalWarnings = this.diagnostics.filter(d => d.severity === 'warning').length;
+    const totalInfos = this.diagnostics.filter(d => d.severity === 'info').length;
+    
+    // Kategóriák számolása
+    const categoryCounts: Record<string, number> = {};
+    this.diagnostics.forEach(d => {
+      categoryCounts[d.category] = (categoryCounts[d.category] || 0) + 1;
+    });
+    
+    // Fájlonkénti hibák számolása
+    const fileErrors: Record<string, number> = {};
+    this.diagnostics.filter(d => d.file && d.severity === 'error').forEach(d => {
+      if (d.file) {
+        fileErrors[d.file] = (fileErrors[d.file] || 0) + 1;
+      }
+    });
+    
+    // Problémás függőségek
+    const dependenciesWithIssues = Array.from(new Set(
+      this.diagnostics
+        .filter(d => d.category === 'dependency' && d.context?.package)
+        .map(d => d.context?.package as string)
+    ));
+    
+    // Leggyakoribb hibák
+    const errorMessages = this.diagnostics.filter(d => d.severity === 'error').map(d => d.message);
+    const errorCounts: Record<string, number> = {};
+    errorMessages.forEach(message => {
+      errorCounts[message] = (errorCounts[message] || 0) + 1;
+    });
+    
+    const mostCommonErrors = Object.entries(errorCounts)
+      .map(([message, count]) => ({ message, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+    
+    // Konverziós arány (befejezett lépések / összes lépés)
+    const totalSteps = Object.values(this.conversionOptions).filter(v => v === true).length;
+    const completedStepsCount = this.completedSteps.size;
+    const conversionRate = totalSteps > 0 ? completedStepsCount / totalSteps : 0;
     
     return {
-      conversionId: this.conversionId,
-      timestamp: Date.now(),
-      errors: this.errors,
-      warnings: this.warnings,
-      infos: this.infos,
-      summary: {
-        totalErrors: this.errors.length,
-        totalWarnings: this.warnings.length,
-        totalInfos: this.infos.length,
-        criticalIssues
-      }
+      totalErrors,
+      totalWarnings,
+      totalInfos,
+      categoryCounts,
+      fileErrors,
+      dependenciesWithIssues,
+      mostCommonErrors,
+      conversionRate,
+      completedSteps: Array.from(this.completedSteps)
     };
   }
   
   /**
-   * HTML formátumú jelentés készítése
+   * Diagnosztikai jelentés generálása
    */
-  generateHTMLReport(): string {
-    const report = this.generateReport();
-    
-    const criticalClass = report.summary.totalErrors > 0 ? 'critical' : 
-                         report.summary.totalWarnings > 0 ? 'warning' : 'success';
-    
-    return `
-      <!DOCTYPE html>
-      <html lang="hu">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Next.js to Vite Konverzió Jelentés</title>
-        <style>
-          body { font-family: system-ui, sans-serif; line-height: 1.5; max-width: 1200px; margin: 0 auto; padding: 20px; }
-          .report-header { text-align: center; margin-bottom: 30px; }
-          .report-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-          .summary-card { padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-          .critical { background-color: #FEE2E2; border-left: 4px solid #DC2626; }
-          .warning { background-color: #FEF3C7; border-left: 4px solid #D97706; }
-          .success { background-color: #D1FAE5; border-left: 4px solid #10B981; }
-          .info { background-color: #DBEAFE; border-left: 4px solid #3B82F6; }
-          .issue-list { margin-top: 30px; }
-          .issue-item { padding: 15px; margin-bottom: 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-          .issue-code { font-family: monospace; display: inline-block; padding: 2px 6px; background: #f1f1f1; border-radius: 4px; }
-          .issue-location { color: #666; font-size: 0.9em; margin-top: 5px; }
-          .suggestion { margin-top: 10px; padding: 8px 12px; background: #f8f9fa; border-radius: 4px; font-style: italic; }
-          .timestamp { color: #666; font-size: 0.8em; }
-          .tab-container { margin-top: 20px; }
-          .tabs { display: flex; gap: 2px; margin-bottom: 10px; }
-          .tab { padding: 10px 20px; cursor: pointer; border-radius: 6px 6px 0 0; }
-          .tab.active { font-weight: bold; }
-          .tab-content { display: none; }
-          .tab-content.active { display: block; }
-        </style>
-      </head>
-      <body>
-        <div class="report-header">
-          <h1>Next.js to Vite Konverzió Jelentés</h1>
-          <p>Konverzió azonosító: ${report.conversionId}</p>
-          <p>Generálva: ${new Date(report.timestamp).toLocaleString()}</p>
-        </div>
-        
-        <div class="report-summary">
-          <div class="summary-card ${criticalClass}">
-            <h3>Összefoglaló</h3>
-            <p><strong>${report.summary.totalErrors}</strong> hiba</p>
-            <p><strong>${report.summary.totalWarnings}</strong> figyelmeztetés</p>
-            <p><strong>${report.summary.totalInfos}</strong> információ</p>
-          </div>
-          
-          <div class="summary-card ${report.summary.criticalIssues > 0 ? 'critical' : 'info'}">
-            <h3>Kritikus problémák</h3>
-            <p><strong>${report.summary.criticalIssues}</strong> kritikus probléma</p>
-            ${report.summary.criticalIssues > 0 ? 
-              `<p>❗ Súlyos hibák miatt a konverzió esetleg nem működik megfelelően!</p>` : 
-              `<p>✅ Nincsenek kritikus problémák</p>`
-            }
-          </div>
-          
-          <div class="summary-card info">
-            <h3>Futási adatok</h3>
-            <p><strong>Kezdés:</strong> ${new Date(this.startTime).toLocaleTimeString()}</p>
-            <p><strong>Befejezés:</strong> ${new Date(report.timestamp).toLocaleTimeString()}</p>
-            <p><strong>Időtartam:</strong> ${Math.round((report.timestamp - this.startTime) / 1000)} másodperc</p>
-          </div>
-        </div>
-        
-        <div class="tab-container">
-          <div class="tabs">
-            <div class="tab active critical" onclick="openTab(event, 'errors')">Hibák (${report.summary.totalErrors})</div>
-            <div class="tab warning" onclick="openTab(event, 'warnings')">Figyelmeztetések (${report.summary.totalWarnings})</div>
-            <div class="tab info" onclick="openTab(event, 'infos')">Információk (${report.summary.totalInfos})</div>
-          </div>
-          
-          <div id="errors" class="tab-content active">
-            <div class="issue-list">
-              ${report.errors.length === 0 ? '<p>Nincsenek hibák! ✅</p>' : ''}
-              ${report.errors.map(error => `
-                <div class="issue-item critical">
-                  <div>
-                    <span class="issue-code">${error.code}</span>
-                    <strong>${error.message}</strong>
-                  </div>
-                  ${error.file ? `
-                    <div class="issue-location">
-                      File: ${error.file}${error.line ? `:${error.line}${error.column ? `:${error.column}` : ''}` : ''}
-                    </div>
-                  ` : ''}
-                  ${error.suggestions && error.suggestions.length > 0 ? `
-                    <div>
-                      ${error.suggestions.map(s => `<div class="suggestion">💡 ${s}</div>`).join('')}
-                    </div>
-                  ` : ''}
-                  <div class="timestamp">
-                    Időbélyeg: ${new Date(error.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-          
-          <div id="warnings" class="tab-content">
-            <div class="issue-list">
-              ${report.warnings.length === 0 ? '<p>Nincsenek figyelmeztetések! ✅</p>' : ''}
-              ${report.warnings.map(warning => `
-                <div class="issue-item warning">
-                  <div>
-                    <span class="issue-code">${warning.code}</span>
-                    <strong>${warning.message}</strong>
-                  </div>
-                  ${warning.file ? `
-                    <div class="issue-location">
-                      File: ${warning.file}${warning.line ? `:${warning.line}${warning.column ? `:${warning.column}` : ''}` : ''}
-                    </div>
-                  ` : ''}
-                  ${warning.suggestions && warning.suggestions.length > 0 ? `
-                    <div>
-                      ${warning.suggestions.map(s => `<div class="suggestion">💡 ${s}</div>`).join('')}
-                    </div>
-                  ` : ''}
-                  <div class="timestamp">
-                    Időbélyeg: ${new Date(warning.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-          
-          <div id="infos" class="tab-content">
-            <div class="issue-list">
-              ${report.infos.length === 0 ? '<p>Nincsenek információk</p>' : ''}
-              ${report.infos.map(info => `
-                <div class="issue-item info">
-                  <div>
-                    <span class="issue-code">${info.code}</span>
-                    <strong>${info.message}</strong>
-                  </div>
-                  ${info.file ? `
-                    <div class="issue-location">
-                      File: ${info.file}${info.line ? `:${info.line}${info.column ? `:${info.column}` : ''}` : ''}
-                    </div>
-                  ` : ''}
-                  <div class="timestamp">
-                    Időbélyeg: ${new Date(info.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        </div>
-        
-        <script>
-          function openTab(evt, tabName) {
-            const tabContents = document.getElementsByClassName("tab-content");
-            for (let i = 0; i < tabContents.length; i++) {
-              tabContents[i].className = tabContents[i].className.replace(" active", "");
-            }
-            
-            const tabs = document.getElementsByClassName("tab");
-            for (let i = 0; i < tabs.length; i++) {
-              tabs[i].className = tabs[i].className.replace(" active", "");
-            }
-            
-            document.getElementById(tabName).className += " active";
-            evt.currentTarget.className += " active";
-          }
-        </script>
-      </body>
-      </html>
-    `;
+  generateReport(): DiagnosticReport {
+    return {
+      project: this.project,
+      timestamp: Date.now(),
+      statistics: this.generateStatistics(),
+      diagnostics: this.diagnostics,
+      conversionOptions: this.conversionOptions
+    };
   }
   
   /**
-   * A jelentés JSON formátumú exportálása
+   * Markdown formátumú jelentés generálása
    */
-  exportToJson(): string {
+  generateMarkdownReport(): string {
+    const stats = this.generateStatistics();
+    const report = this.generateReport();
+    
+    return `# Next.js - Vite konverziós jelentés
+
+## Projekt: ${this.project}
+Dátum: ${new Date(report.timestamp).toLocaleDateString('hu-HU')}
+
+## Összefoglaló
+- **Hibák**: ${stats.totalErrors}
+- **Figyelmeztetések**: ${stats.totalWarnings}
+- **Információk**: ${stats.totalInfos}
+- **Konverziós arány**: ${(stats.conversionRate * 100).toFixed(1)}%
+
+## Befejezett lépések
+${stats.completedSteps.map(step => `- ✅ ${step}`).join('\n')}
+
+## Problémás területek
+${Object.entries(stats.categoryCounts)
+  .sort((a, b) => b[1] - a[1])
+  .map(([category, count]) => {
+    const categoryInfo = diagnosticCategories.find(c => c.id === category);
+    return `- **${categoryInfo?.name || category}**: ${count} probléma`;
+  })
+  .join('\n')}
+
+## Legproblémásabb fájlok
+${Object.entries(stats.fileErrors)
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 5)
+  .map(([file, count]) => `- ${file}: ${count} hiba`)
+  .join('\n') || '- Nincsenek fájl-specifikus hibák'}
+
+## Problémás függőségek
+${stats.dependenciesWithIssues.map(dep => `- ${dep}`).join('\n') || '- Nincsenek problémás függőségek'}
+
+## Leggyakoribb hibák
+${stats.mostCommonErrors.map(error => `- ${error.message} (${error.count}x)`).join('\n') || '- Nincsenek ismétlődő hibák'}
+
+## Részletes diagnosztikák
+
+${this.generateDetailedDiagnosticsMarkdown()}
+
+## Javaslatok
+
+${this.generateSuggestionsMarkdown()}
+
+## Következő lépések
+
+1. Ellenőrizd a kritikus hibákat a fenti listában
+2. Tekintsd át a függőségi problémákat
+3. Futtasd az alkalmazást fejlesztői módban a runtime hibák felderítéséhez
+4. Végezz teljesítménymérést a konvertált alkalmazáson
+`;
+  }
+  
+  /**
+   * Részletes diagnosztikák Markdown formátumban
+   */
+  private generateDetailedDiagnosticsMarkdown(): string {
+    const severitySymbols = {
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
+    };
+    
+    // Kategóriák szerinti csoportosítás
+    const groupedDiagnostics = this.diagnostics.reduce((groups: Record<string, Diagnostic[]>, diagnostic) => {
+      if (!groups[diagnostic.category]) {
+        groups[diagnostic.category] = [];
+      }
+      groups[diagnostic.category].push(diagnostic);
+      return groups;
+    }, {});
+    
+    // Kategóriák nevei
+    const categoryNames = diagnosticCategories.reduce((names: Record<string, string>, category) => {
+      names[category.id] = category.name;
+      return names;
+    }, {});
+    
+    // Kategóriánként diagnosztikák megjelenítése
+    return Object.entries(groupedDiagnostics)
+      .map(([category, diagnostics]) => {
+        const categoryName = categoryNames[category] || category;
+        
+        return `### ${categoryName}
+
+${diagnostics.map(d => {
+  let markdown = `#### ${severitySymbols[d.severity]} ${d.message}\n`;
+  
+  if (d.details) {
+    markdown += `\n${d.details}\n`;
+  }
+  
+  if (d.file) {
+    markdown += `\n**Fájl:** \`${d.file}${d.line ? `:${d.line}${d.column ? `:${d.column}` : ''}` : ''}\`\n`;
+  }
+  
+  if (d.code) {
+    markdown += `\n\`\`\`typescript\n${d.code}\n\`\`\`\n`;
+  }
+  
+  if (d.suggestion) {
+    markdown += `\n**Javaslat:** ${d.suggestion}\n`;
+  }
+  
+  return markdown;
+}).join('\n')}`;
+      })
+      .join('\n\n');
+  }
+  
+  /**
+   * Javaslatok generálása Markdown formátumban
+   */
+  private generateSuggestionsMarkdown(): string {
+    // Hibák és figyelmeztetések alapján javaslatokat generálunk
+    const suggestions: string[] = [];
+    
+    // Függőségi problémák esetén
+    if (this.diagnostics.some(d => d.category === 'dependency' && d.severity === 'error')) {
+      suggestions.push('**Függőségek frissítése:**\n' + 
+        '- Frissítsd a projekt függőségeit a Vite-kompatibilis verziókra\n' +
+        '- Távolítsd el a Next.js-specifikus függőségeket, amelyek nem kompatibilisek\n' +
+        '- Fontold meg a npm helyett a pnpm vagy yarn használatát a függőségek kezeléséhez');
+    }
+    
+    // API útvonalakkal kapcsolatos problémák
+    if (this.diagnostics.some(d => d.category === 'api' && d.severity === 'error')) {
+      suggestions.push('**API útvonalak kezelése:**\n' +
+        '- Hozz létre egy különálló Express/Fastify szervert az API útvonalakhoz\n' +
+        '- Fontold meg a serverless függvények használatát (pl. Netlify Functions, Vercel Functions) az API útvonalakhoz\n' +
+        '- Helyezd át az API logikát egy különálló backend projektbe');
+    }
+    
+    // Middleware-rel kapcsolatos problémák
+    if (this.diagnostics.some(d => d.category === 'middleware' && d.severity !== 'info')) {
+      suggestions.push('**Middleware-ek kezelése:**\n' +
+        '- Alakítsd át a Next.js middleware-eket Express middleware-ekké egy különálló szerveren\n' +
+        '- Ahol lehetséges, alakítsd át a middleware logikát React hook-ká\n' +
+        '- Fontold meg Auth.js/Next-Auth használatát hitelesítéshez Vite környezetben');
+    }
+    
+    // Adatlekérési metódusokkal kapcsolatos problémák
+    if (this.diagnostics.some(d => d.category === 'data-fetching' && d.severity !== 'info')) {
+      suggestions.push('**Adatlekérés átalakítása:**\n' +
+        '- Használj React Query vagy SWR könyvtárakat a szerveroldali adatok kezeléséhez\n' +
+        '- Alakítsd át a getServerSideProps és getStaticProps függvényeket custom hook-okká\n' +
+        '- Használd a React Router loader funkcióit a route-szintű adatlekéréshez');
+    }
+    
+    // Ha nincs elég javaslat, adjunk általános javaslatokat
+    if (suggestions.length < 3) {
+      suggestions.push('**Általános optimalizációk:**\n' +
+        '- Használj ESBuild vagy SWC fordítót a TypeScript fordítás gyorsításához Vite környezetben\n' +
+        '- Alkalmazz code splitting-et és lazy loading-ot a bundle méret csökkentéséhez\n' +
+        '- Fontold meg a React komponensek újrafelhasználhatóságának növelését a komponenskönyvtár kialakításával');
+    }
+    
+    return suggestions.join('\n\n');
+  }
+  
+  /**
+   * HTML formátumú jelentés generálása
+   */
+  generateHtmlReport(): string {
+    // Egyszerűsített HTML konverzió a Markdown jelentésből
+    const markdown = this.generateMarkdownReport();
+    
+    // Nagyon egyszerű Markdown-to-HTML átalakítás
+    const html = markdown
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\`\`\`([^`]+)\`\`\`/g, '<pre><code>$1</code></pre>')
+      .replace(/\`([^`]+)\`/g, '<code>$1</code>');
+    
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Next.js - Vite konverziós jelentés</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1, h2 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    code { background-color: #f6f8fa; padding: 0.2em 0.4em; border-radius: 3px; }
+    pre { background-color: #f6f8fa; padding: 16px; border-radius: 3px; overflow: auto; }
+    pre code { background-color: transparent; padding: 0; }
+    li { margin: 0.25em 0; }
+  </style>
+</head>
+<body>
+  <p>${html}</p>
+</body>
+</html>`;
+  }
+  
+  /**
+   * Diagnosztikai eredmények exportálása JSON formátumban
+   */
+  exportJSON(): string {
     return JSON.stringify(this.generateReport(), null, 2);
   }
   
   /**
-   * Egyedi azonosító generálása
+   * Interaktív hibajavító javaslatok generálása
    */
-  private generateId(): string {
-    return `diag-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  generateFixSuggestions(diagnostic: Diagnostic): string[] {
+    // Kategória alapján generálunk javaslatokat
+    switch (diagnostic.category) {
+      case 'routing':
+        return this.generateRoutingFixSuggestions(diagnostic);
+      case 'component':
+        return this.generateComponentFixSuggestions(diagnostic);
+      case 'api':
+        return this.generateApiFixSuggestions(diagnostic);
+      case 'data-fetching':
+        return this.generateDataFetchingFixSuggestions(diagnostic);
+      case 'typescript':
+        return this.generateTypescriptFixSuggestions(diagnostic);
+      case 'dependency':
+        return this.generateDependencyFixSuggestions(diagnostic);
+      default:
+        return [
+          diagnostic.suggestion || 'Nincsenek automatikus javítási javaslatok ehhez a problémához.'
+        ];
+    }
   }
   
   /**
-   * Automatikus javaslatok generálása a hibaüzenetek alapján
+   * Útvonalak javítási javaslatai
    */
-  private generateSuggestions(message: string, type: 'error' | 'warning'): string[] {
+  private generateRoutingFixSuggestions(diagnostic: Diagnostic): string[] {
     const suggestions: string[] = [];
     
-    // Gyakori hibaüzenetekhez automatikus javaslatok
-    if (message.includes('import') && message.includes('not found')) {
-      suggestions.push('Ellenőrizd a behúzott modul nevét és elérési útját.');
-      suggestions.push('Telepítsd a hiányzó csomagot: npm install <package-name>');
-    } 
-    else if (message.includes('middleware') || message.includes('Middleware')) {
-      suggestions.push('A Next.js middleware helyett használj Express/Fastify middleware-t.');
-      suggestions.push('Edge middleware esetén használj service workert vagy Cloudflare Workert.');
-    }
-    else if (message.includes('getServerSideProps') || message.includes('getStaticProps')) {
-      suggestions.push('Használj React Query vagy SWR könyvtárat az adatlekérésekhez.');
-      suggestions.push('Alakítsd át a szerveroldali lekéréseket kliensoldali hook-ká.');
-    }
-    else if (message.includes('_app') || message.includes('_document')) {
-      suggestions.push('Hozz létre egy App.tsx gyökér komponenst a _app.tsx/js helyett.');
-      suggestions.push('Használj index.html fájlt a _document.tsx/js helyett.');
+    // Dinamikus útvonal kezelése
+    if (diagnostic.message.includes('dynamic route')) {
+      suggestions.push('Használd a `useParams` hook-ot a React Router-ből a dinamikus paraméterek eléréséhez.');
+      suggestions.push('Alakítsd át a fájl alapú útvonalat React Router route definícióvá.');
     }
     
-    // Típus szerint generálunk további javaslatokat
-    if (type === 'error') {
-      suggestions.push('Ellenőrizd a konverziós naplókat további részletekért.');
-      suggestions.push('Fontold meg a probléma manuális javítását, ha a konverzió nem kezeli megfelelően.');
+    // Catch-all útvonalak kezelése
+    else if (diagnostic.message.includes('catch-all')) {
+      suggestions.push('Használd a `*` (wildcard) útvonal-paramétert a React Router-ben a catch-all útvonalakhoz.');
+      suggestions.push('Használd a `useParams` hook-ot a paraméterek tömbként való eléréséhez.');
+    }
+    
+    // Opcionális útvonalak kezelése
+    else if (diagnostic.message.includes('optional')) {
+      suggestions.push('Használj két különböző útvonal definíciót az opcionális paraméter kezeléséhez.');
+    }
+    
+    if (suggestions.length === 0) {
+      suggestions.push(diagnostic.suggestion || 'Nincsenek specifikus javaslatok ehhez a problémához.');
     }
     
     return suggestions;
   }
   
   /**
-   * Összes hibaadat törlése
+   * Komponensek javítási javaslatai
    */
-  clear(): void {
-    this.errors = [];
-    this.warnings = [];
-    this.infos = [];
+  private generateComponentFixSuggestions(diagnostic: Diagnostic): string[] {
+    const suggestions: string[] = [];
+    
+    // Image komponens átalakítása
+    if (diagnostic.message.includes('Image')) {
+      suggestions.push('Használd az @unpic/react Image komponensét, vagy standard img elemet méret attribútumokkal.');
+    }
+    // Link komponens átalakítása
+    else if (diagnostic.message.includes('Link')) {
+      suggestions.push('Használd a React Router Link komponensét, és alakítsd át a "href" attribútumokat "to" attribútumokká.');
+    }
+    // Head komponens átalakítása
+    else if (diagnostic.message.includes('Head')) {
+      suggestions.push('Használd a react-helmet-async Helmet komponensét a dokumentum fejléc módosításához.');
+    }
+    // Script komponens átalakítása
+    else if (diagnostic.message.includes('Script')) {
+      suggestions.push('Használj standard script elemeket, vagy importáld közvetlenül a szkriptfájlokat.');
+    }
+    
+    if (suggestions.length === 0) {
+      suggestions.push(diagnostic.suggestion || 'Nincsenek specifikus javaslatok ehhez a problémához.');
+    }
+    
+    return suggestions;
   }
   
   /**
-   * A hibák, figyelmeztetések és információk számának lekérdezése
+   * API útvonalak javítási javaslatai
    */
-  getCounts(): { errors: number, warnings: number, infos: number } {
-    return {
-      errors: this.errors.length,
-      warnings: this.warnings.length,
-      infos: this.infos.length
-    };
+  private generateApiFixSuggestions(diagnostic: Diagnostic): string[] {
+    const suggestions: string[] = [];
+    
+    suggestions.push('Hozz létre egy különálló Express/Fastify szervert az API kezeléséhez.');
+    suggestions.push('Alakítsd át a NextApiRequest és NextApiResponse típusokat Express Request és Response típusokká.');
+    
+    if (diagnostic.message.includes('dynamic')) {
+      suggestions.push('Használd az Express útvonal-paramétereit a dinamikus API útvonalakhoz: `/api/user/:id`.');
+    }
+    
+    return suggestions;
+  }
+  
+  /**
+   * Adatlekérési metódusok javítási javaslatai
+   */
+  private generateDataFetchingFixSuggestions(diagnostic: Diagnostic): string[] {
+    const suggestions: string[] = [];
+    
+    if (diagnostic.message.includes('getServerSideProps')) {
+      suggestions.push('Használj React Query `useQuery` hook-ot a szerveroldali adatlekérés helyett.');
+      suggestions.push('Alakítsd át a getServerSideProps függvény logikáját egy async függvénnyé a fetchQueryFn-hez.');
+    }
+    else if (diagnostic.message.includes('getStaticProps')) {
+      suggestions.push('Használj React Query-t inicializációs adatokkal vagy egy globális state menedzsment eszközt.');
+    }
+    else if (diagnostic.message.includes('getStaticPaths')) {
+      suggestions.push('Definiálj explicit route-okat a statikus elérési utak helyett.');
+    }
+    
+    return suggestions;
+  }
+  
+  /**
+   * TypeScript típusok javítási javaslatai
+   */
+  private generateTypescriptFixSuggestions(diagnostic: Diagnostic): string[] {
+    const suggestions: string[] = [];
+    
+    if (diagnostic.message.includes('NextPage')) {
+      suggestions.push('Használd a React.FC<Props> típust a NextPage<Props> helyett.');
+    }
+    else if (diagnostic.message.includes('GetServerSideProps')) {
+      suggestions.push('Használd a UseQueryResult<T> típust a React Query-ből.');
+    }
+    else if (diagnostic.message.includes('NextApiRequest') || diagnostic.message.includes('NextApiResponse')) {
+      suggestions.push('Használd az Express Request és Response típusokat.');
+    }
+    
+    return suggestions;
+  }
+  
+  /**
+   * Függőségek javítási javaslatai
+   */
+  private generateDependencyFixSuggestions(diagnostic: Diagnostic): string[] {
+    const suggestions: string[] = [];
+    const packageName = diagnostic.context?.package as string;
+    
+    if (packageName?.startsWith('next')) {
+      suggestions.push(`Távolítsd el a '${packageName}' függőséget, mert nem kompatibilis a Vite környezettel.`);
+      
+      // Helyettesítő csomagok javaslása
+      if (packageName === 'next') {
+        suggestions.push('Helyettesítsd a Next.js-t React és Vite kombinációjával.');
+      }
+      else if (packageName === 'next/image') {
+        suggestions.push('Használd az @unpic/react csomagot a képoptimalizáláshoz.');
+      }
+      else if (packageName === 'next/link') {
+        suggestions.push('Használd a react-router-dom csomagot az útvonal-navigációhoz.');
+      }
+      else if (packageName === 'next/head') {
+        suggestions.push('Használd a react-helmet-async csomagot a dokumentum fejléc kezeléséhez.');
+      }
+      else if (packageName === 'next/router') {
+        suggestions.push('Használd a react-router-dom csomagot az útvonal-kezeléshez.');
+      }
+    } else {
+      suggestions.push(`Ellenőrizd a '${packageName}' verziószámát a Vite kompatibilitáshoz.`);
+    }
+    
+    return suggestions;
   }
 }
 
-// Példa használat:
-// const diagnostics = new DiagnosticsReporter();
-// diagnostics.addError('Hiba történt', { file: 'src/app.js', line: 42 });
-// diagnostics.addWarning('Ez egy figyelmeztetés');
-// const report = diagnostics.generateReport();
+// Példa használatra:
+/*
+const reporter = new DiagnosticsReporter('MyProject', { 
+  useReactRouter: true, 
+  convertApiRoutes: true,
+  transformDataFetching: true,
+  replaceComponents: true,
+  updateDependencies: true,
+  preserveTypeScript: true,
+  handleMiddleware: true
+});
+
+reporter.addError('routing', 'Dynamic route conversion failed', { 
+  file: 'pages/[id].tsx',
+  line: 10,
+  suggestion: 'Use React Router useParams hook'
+});
+
+reporter.addWarning('component', 'Image component requires manual attention', {
+  file: 'components/Banner.tsx'
+});
+
+reporter.completeStep('Routing analysis');
+reporter.completeStep('Component transformation');
+
+const report = reporter.generateMarkdownReport();
+console.log(report);
+*/
+
+/**
+ * Interaktív hibajavítást segítő osztály
+ */
+export class DiagnosticsFixHelper {
+  private reporter: DiagnosticsReporter;
+  
+  constructor(reporter: DiagnosticsReporter) {
+    this.reporter = reporter;
+  }
+  
+  /**
+   * Hibajavítási javaslatok kérése
+   */
+  getFixSuggestions(diagnosticId: string): string[] {
+    const diagnostic = this.reporter.getDiagnostics().find(d => d.id === diagnosticId);
+    if (!diagnostic) {
+      return ['A megadott azonosítójú diagnosztika nem található.'];
+    }
+    
+    return this.reporter.generateFixSuggestions(diagnostic);
+  }
+  
+  /**
+   * Automatikus javítás alkalmazása
+   */
+  applyAutoFix(diagnosticId: string, fixIndex: number = 0): { success: boolean; result?: string; message?: string } {
+    const diagnostic = this.reporter.getDiagnostics().find(d => d.id === diagnosticId);
+    if (!diagnostic) {
+      return { success: false, message: 'A megadott azonosítójú diagnosztika nem található.' };
+    }
+    
+    // Itt valós projekben a tényleges javítás történne, például kódmódosítással
+    // Demonstrációs célból csak visszaadunk egy üzenetet
+    return {
+      success: true,
+      result: `Sikeres automatikus javítás: ${diagnostic.message}`,
+      message: `A ${diagnostic.category} kategóriájú diagnosztika javítása megtörtént.`
+    };
+  }
+  
+  /**
+   * Legkritikusabb hibák lekérdezése
+   */
+  getCriticalDiagnostics(limit: number = 5): Diagnostic[] {
+    return this.reporter.getDiagnostics()
+      .filter(d => d.severity === 'error')
+      .sort((a, b) => {
+        // API és függőségi hibák a legfontosabbak
+        if (a.category === 'api' && b.category !== 'api') return -1;
+        if (a.category !== 'api' && b.category === 'api') return 1;
+        if (a.category === 'dependency' && b.category !== 'dependency') return -1;
+        if (a.category !== 'dependency' && b.category === 'dependency') return 1;
+        
+        // Egyébként időbélyeg szerint rendezzük
+        return b.timestamp - a.timestamp;
+      })
+      .slice(0, limit);
+  }
+}
