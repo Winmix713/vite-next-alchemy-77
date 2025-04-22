@@ -183,7 +183,12 @@ export function transformCode(sourceCode: string): {
 
   for (const rule of nextToViteTransformations) {
     if (rule.pattern.test(transformedCode)) {
-      transformedCode = transformedCode.replace(rule.pattern, rule.replacement);
+      // Fix the type issue by properly handling the replacement type
+      if (typeof rule.replacement === 'string') {
+        transformedCode = transformedCode.replace(rule.pattern, rule.replacement);
+      } else if (typeof rule.replacement === 'function') {
+        transformedCode = transformedCode.replace(rule.pattern, rule.replacement as (substring: string, ...args: any[]) => string);
+      }
       appliedTransformations.push(rule.description);
     }
   }
