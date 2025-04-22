@@ -22,7 +22,8 @@ const ConversionDashboard = ({
     transformDataFetching: true,
     replaceComponents: true,
     updateDependencies: true,
-    preserveTypeScript: true
+    preserveTypeScript: true,
+    handleMiddleware: true // új opció hozzáadva
   });
 
   const toggleOption = (option: keyof typeof options) => {

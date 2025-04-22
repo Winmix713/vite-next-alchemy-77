@@ -1,3 +1,4 @@
+
 import { analyzeNextJsRoutes, convertToReactRoutes, NextJsRoute } from "./routeConverter";
 import { analyzeDependencies, generatePackageJsonUpdates, checkVersionCompatibility, generateInstallCommand } from "./dependencyManager";
 import { transformCode, getTransformationStats } from "./codeTransformer";
@@ -91,12 +92,12 @@ export class ConversionExecutor {
         await this.replaceComponents();
       }
 
-      // Add new steps
+      // 6. Middleware kezelése
       if (this.options.handleMiddleware) {
         await this.handleMiddlewares();
       }
       
-      // Generate CI/CD configs at the end
+      // 7. CI/CD konfigurációk generálása
       await this.generateCICDFiles();
       
       this.updateProgress(100, "Konverzió befejezve!");

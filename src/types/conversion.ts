@@ -6,6 +6,7 @@ export interface ConversionOptions {
   replaceComponents: boolean;
   updateDependencies: boolean;
   preserveTypeScript: boolean;
+  handleMiddleware?: boolean;
 }
 
 export interface RouteConversionResult {
