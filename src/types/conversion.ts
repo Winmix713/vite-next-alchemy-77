@@ -266,3 +266,31 @@ export interface TypeConversionStatistics {
   warnings: number;
   errors: TypeConversionError[];
 }
+
+/**
+ * AST Babel típusok a TypeScript-hez
+ * Ez segít a Babel típusok verzió különbségeinek kezelésében
+ */
+export interface BabelCompatTypes {
+  ParserPlugin: string;
+  NodePath: any;
+  types: {
+    identifier: (name: string) => any;
+    stringLiteral: (value: string) => any;
+    arrowFunctionExpression: (params: any[], body: any, async?: boolean) => any;
+    objectExpression: (properties: any[]) => any;
+    objectProperty: (key: any, value: any) => any;
+    arrayExpression: (elements: any[]) => any;
+    callExpression: (callee: any, args: any[]) => any;
+    jsxAttribute: (name: any, value: any) => any;
+    jsxIdentifier: (name: string) => any;
+    booleanLiteral: (value: boolean) => any;
+    jsxExpressionContainer: (expression: any) => any;
+    numericLiteral: (value: number) => any;
+    memberExpression: (object: any, property: any) => any;
+    functionDeclaration: (id: any, params: any[], body: any) => any;
+    blockStatement: (body: any[]) => any;
+    returnStatement: (argument: any) => any;
+    commentStatement: (comment: string) => any;
+  };
+}
