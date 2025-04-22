@@ -1,5 +1,5 @@
-
 import { RouteObject } from "react-router-dom";
+import { RouteConversionResult } from "@/types/conversion";
 
 export interface NextJsRoute {
   path: string;
@@ -13,7 +13,6 @@ export function analyzeNextJsRoutes(files: File[]): NextJsRoute[] {
   const routes: NextJsRoute[] = [];
   
   files.forEach(file => {
-    // Analyze file path to detect Next.js route patterns
     if (file.name.includes('pages/')) {
       const path = file.name
         .replace(/^pages/, '')
@@ -42,7 +41,6 @@ export function convertToReactRoutes(nextRoutes: NextJsRoute[]): RouteObject[] {
   return nextRoutes.map(route => {
     let reactPath = route.path;
     
-    // Convert Next.js dynamic routes to React Router format
     if (route.isDynamic) {
       route.params?.forEach(param => {
         reactPath = reactPath.replace(`[${param}]`, `:${param}`);
@@ -51,9 +49,55 @@ export function convertToReactRoutes(nextRoutes: NextJsRoute[]): RouteObject[] {
 
     return {
       path: reactPath,
-      // In a real implementation, this would be the actual component
-      // For now, we'll use a placeholder
-      element: `<div>Route: ${reactPath}</div>`
+      element: generateRouteComponent(route)
     };
   });
+}
+
+export function generateRouteComponent(route: NextJsRoute): string {
+  const result: RouteConversionResult = {
+    originalPath: route.path,
+    convertedPath: route.path.replace(/\[(\w+)\]/g, ':$1'),
+    component: route.component,
+    imports: [
+      "import React from 'react'",
+      "import { useParams } from 'react-router-dom'"
+    ],
+    code: ''
+  };
+
+  if (route.isDynamic) {
+    result.code = `
+const ${getComponentName(route)} = () => {
+  const params = useParams();
+  return (
+    <div>
+      <h1>Dynamic Route: ${route.path}</h1>
+      <pre>{JSON.stringify(params, null, 2)}</pre>
+    </div>
+  );
+};`;
+  } else {
+    result.code = `
+const ${getComponentName(route)} = () => {
+  return (
+    <div>
+      <h1>Static Route: ${route.path}</h1>
+    </div>
+  );
+};`;
+  }
+
+  return result.code;
+}
+
+function getComponentName(route: NextJsRoute): string {
+  return route.component
+    .replace(/^pages\//, '')
+    .replace(/\/(index)?$/, '')
+    .split('/')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('')
+    .replace(/\W+/g, '')
+    .replace(/^\d+/, '') || 'Page';
 }
