@@ -1,4 +1,3 @@
-
 interface PerformanceMetrics {
   buildTime: number;
   bundleSize: {
@@ -203,8 +202,13 @@ export class PerformanceMonitor {
           totalSize += resource.transferSize;
         }
         
-        // Ellenőrizzük a cache-elhetőséget
-        if (resource.responseHeaders && resource.responseHeaders.includes('cache-control: max-age=')) {
+        // Check for cache control headers using proper methods
+        // Since responseHeaders isn't available in PerformanceResourceTiming
+        // we'll use a different approach to determine cacheability
+        if (
+          resource.transferSize < resource.encodedBodySize || 
+          resource.responseEnd - resource.requestStart < 30
+        ) {
           cacheableResources++;
         }
       });

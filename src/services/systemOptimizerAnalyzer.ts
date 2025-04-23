@@ -1,4 +1,3 @@
-
 import { analyzeNextJsRoutes } from './routeConverter';
 import { analyzeDependencies, checkVersionCompatibility } from './dependencyManager';
 import { transformCode, getTransformationStats } from './codeTransformer';
@@ -568,19 +567,19 @@ export class SystemOptimizerAnalyzer {
 export async function validateConversionSystem(): Promise<{
   valid: boolean;
   issues: string[];
-  components: { name: string; status: 'ok' | 'warning' | 'error'; message?: string }[];
+  components: { name: string; status: 'ok' as 'ok' | 'warning' | 'error'; message?: string }[];
 }> {
   console.log('Konverziós rendszer validálása...');
   
   const components = [
-    { name: 'routeConverter', status: 'ok' as const },
-    { name: 'codeTransformer', status: 'ok' as const },
-    { name: 'astTransformer', status: 'ok' as const },
-    { name: 'middlewareTransformer', status: 'ok' as const },
-    { name: 'apiRouteTransformer', status: 'ok' as const },
-    { name: 'dependencyManager', status: 'ok' as const },
-    { name: 'performanceMonitor', status: 'ok' as const },
-    { name: 'diagnosticsReporter', status: 'ok' as const }
+    { name: 'routeConverter', status: 'ok' as 'ok' | 'warning' | 'error' },
+    { name: 'codeTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
+    { name: 'astTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
+    { name: 'middlewareTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
+    { name: 'apiRouteTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
+    { name: 'dependencyManager', status: 'ok' as 'ok' | 'warning' | 'error' },
+    { name: 'performanceMonitor', status: 'ok' as 'ok' | 'warning' | 'error' },
+    { name: 'diagnosticsReporter', status: 'ok' as 'ok' | 'warning' | 'error' }
   ];
   
   const issues: string[] = [];
@@ -591,32 +590,44 @@ export async function validateConversionSystem(): Promise<{
     const routeConverterValid = typeof analyzeNextJsRoutes === 'function';
     if (!routeConverterValid) {
       components[0].status = 'error';
-      components[0].message = 'A routeConverter komponens nem elérhető vagy hibás.';
-      issues.push('RouteConverter validálási hiba');
+      components[0] = { 
+        ...components[0],
+        message: 'The routeConverter component is not available or is faulty.'
+      };
+      issues.push('RouteConverter validation error');
     }
     
     // CodeTransformer ellenőrzése
     const codeTransformerValid = typeof transformCode === 'function';
     if (!codeTransformerValid) {
       components[1].status = 'error';
-      components[1].message = 'A codeTransformer komponens nem elérhető vagy hibás.';
-      issues.push('CodeTransformer validálási hiba');
+      components[1] = { 
+        ...components[1],
+        message: 'The codeTransformer component is not available or is faulty.'
+      };
+      issues.push('CodeTransformer validation error');
     }
     
     // AstTransformer ellenőrzése
     const astTransformerValid = typeof analyzeCodeStructure === 'function';
     if (!astTransformerValid) {
       components[2].status = 'error';
-      components[2].message = 'Az astTransformer komponens nem elérhető vagy hibás.';
-      issues.push('AstTransformer validálási hiba');
+      components[2] = { 
+        ...components[2],
+        message: 'The astTransformer component is not available or is faulty.'
+      };
+      issues.push('AstTransformer validation error');
     }
     
     // MiddlewareTransformer ellenőrzése
     const middlewareTransformerValid = typeof transformMiddleware === 'function';
     if (!middlewareTransformerValid) {
       components[3].status = 'error';
-      components[3].message = 'A middlewareTransformer komponens nem elérhető vagy hibás.';
-      issues.push('MiddlewareTransformer validálási hiba');
+      components[3] = { 
+        ...components[3],
+        message: 'The middlewareTransformer component is not available or is faulty.'
+      };
+      issues.push('MiddlewareTransformer validation error');
     }
     
   } catch (error) {

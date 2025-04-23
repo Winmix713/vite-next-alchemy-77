@@ -1,6 +1,5 @@
-
 interface CICDTemplate {
-  platform: 'vercel' | 'netlify' | 'github' | 'gitlab' | 'azure' | 'aws';
+  platform: 'vercel' | 'netlify' | 'github' | 'gitlab' | 'azure' | 'aws' | 'docker';
   config: string;
   filename: string;
   description: string;
@@ -389,7 +388,7 @@ stages:
 export const generateAwsConfig = (): CICDTemplate => ({
   platform: 'aws',
   filename: 'aws-cloudformation.yml',
-  description: 'AWS CloudFormation sablon az alkalmazás S3 + CloudFront telepítéshez',
+  description: 'AWS CloudFormation template for S3 + CloudFront deployment',
   config: `AWSTemplateFormatVersion: '2010-09-09'
 Description: 'React Vite App Deployment to S3 with CloudFront'
 
@@ -427,7 +426,7 @@ Resources:
         Statement:
           - Action: 's3:GetObject'
             Effect: Allow
-            Resource: !Sub 'arn:aws:s3:::${S3Bucket}/*'
+            Resource: !Sub 'arn:aws:s3:::\${S3Bucket}/*'
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
   
@@ -435,7 +434,7 @@ Resources:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub 'OAI for ${DomainName}'
+        Comment: !Sub 'OAI for \${DomainName}'
   
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -445,7 +444,7 @@ Resources:
           - DomainName: !GetAtt S3Bucket.RegionalDomainName
             Id: S3Origin
             S3OriginConfig:
-              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/\${CloudFrontOriginAccessIdentity}'
         Enabled: true
         DefaultRootObject: index.html
         CustomErrorResponses:
@@ -480,7 +479,7 @@ Resources:
           - DomainName: !GetAtt S3Bucket.RegionalDomainName
             Id: S3Origin
             S3OriginConfig:
-              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/\${CloudFrontOriginAccessIdentity}'
 
 Outputs:
   S3BucketName:

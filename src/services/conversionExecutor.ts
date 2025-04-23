@@ -1,4 +1,3 @@
-
 import { analyzeNextJsRoutes, convertToReactRoutes, NextJsRoute } from "./routeConverter";
 import { analyzeDependencies, generatePackageJsonUpdates, checkVersionCompatibility, generateInstallCommand } from "./dependencyManager";
 import { transformCode, getTransformationStats } from "./codeTransformer";
@@ -256,9 +255,19 @@ export class ConversionExecutor {
       const templates = generateCICDTemplates();
       
       for (const [platform, template] of Object.entries(templates)) {
-        this.result.info.push(
-          `${platform} konfiguráció generálva: ${template.filename}`
-        );
+        if (Array.isArray(template)) {
+          // Handle array of templates
+          template.forEach(t => {
+            this.result.info.push(
+              `${platform} konfiguráció generálva: ${t.filename}`
+            );
+          });
+        } else {
+          // Handle single template
+          this.result.info.push(
+            `${platform} konfiguráció generálva: ${template.filename}`
+          );
+        }
       }
       
     } catch (error) {
