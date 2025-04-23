@@ -1,3 +1,4 @@
+
 import { analyzeNextJsRoutes } from './routeConverter';
 import { analyzeDependencies, checkVersionCompatibility } from './dependencyManager';
 import { transformCode, getTransformationStats } from './codeTransformer';
@@ -30,11 +31,11 @@ export class SystemOptimizerAnalyzer {
    * Rendszerszintű elemzés és optimalizálás futtatása
    */
   async runSystemAnalysis(): Promise<{
-    diagnostics: any,
-    performance: any,
-    suggestions: string[],
-    issues: string[],
-    optimizations: string[]
+    diagnostics: any;
+    performance: any;
+    suggestions: string[];
+    issues: string[];
+    optimizations: string[];
   }> {
     this.performanceMonitor.startMeasurement();
     
@@ -215,8 +216,8 @@ export class SystemOptimizerAnalyzer {
    * Függőségek elemzése
    */
   private analyzeDependencies(): { 
-    dependencies: any[], 
-    compatibility: { compatible: boolean, issues: string[] }
+    dependencies: any[]; 
+    compatibility: { compatible: boolean; issues: string[] };
   } {
     console.log('Függőségek elemzése...');
     
@@ -567,19 +568,19 @@ export class SystemOptimizerAnalyzer {
 export async function validateConversionSystem(): Promise<{
   valid: boolean;
   issues: string[];
-  components: { name: string; status: 'ok' as 'ok' | 'warning' | 'error'; message?: string }[];
+  components: { name: string; status: 'ok' | 'warning' | 'error'; message?: string }[];
 }> {
   console.log('Konverziós rendszer validálása...');
   
   const components = [
-    { name: 'routeConverter', status: 'ok' as 'ok' | 'warning' | 'error' },
-    { name: 'codeTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
-    { name: 'astTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
-    { name: 'middlewareTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
-    { name: 'apiRouteTransformer', status: 'ok' as 'ok' | 'warning' | 'error' },
-    { name: 'dependencyManager', status: 'ok' as 'ok' | 'warning' | 'error' },
-    { name: 'performanceMonitor', status: 'ok' as 'ok' | 'warning' | 'error' },
-    { name: 'diagnosticsReporter', status: 'ok' as 'ok' | 'warning' | 'error' }
+    { name: 'routeConverter', status: 'ok' as const },
+    { name: 'codeTransformer', status: 'ok' as const },
+    { name: 'astTransformer', status: 'ok' as const },
+    { name: 'middlewareTransformer', status: 'ok' as const },
+    { name: 'apiRouteTransformer', status: 'ok' as const },
+    { name: 'dependencyManager', status: 'ok' as const },
+    { name: 'performanceMonitor', status: 'ok' as const },
+    { name: 'diagnosticsReporter', status: 'ok' as const }
   ];
   
   const issues: string[] = [];
