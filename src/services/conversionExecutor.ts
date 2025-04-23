@@ -1,3 +1,4 @@
+
 import { analyzeNextJsRoutes, convertToReactRoutes, NextJsRoute } from "./routeConverter";
 import { analyzeDependencies, generatePackageJsonUpdates, checkVersionCompatibility, generateInstallCommand } from "./dependencyManager";
 import { transformCode, getTransformationStats } from "./codeTransformer";
@@ -59,14 +60,20 @@ export class ConversionExecutor {
   
   private updateProgress(increment: number, message: string) {
     this.progress += increment;
+    // Ensure progress doesn't exceed 100
+    this.progress = Math.min(this.progress, 100);
+    
     if (this.progressCallback) {
       this.progressCallback(this.progress, message);
     }
+    
+    // Add artificial delay to make progress visible for smaller projects
+    return new Promise(resolve => setTimeout(resolve, 500));
   }
   
   async execute(): Promise<ConversionResult> {
     try {
-      this.updateProgress(5, "Kezdés: projekt elemzése...");
+      await this.updateProgress(5, "Kezdés: projekt elemzése...");
       
       // 1. Függőségek elemzése
       if (this.options.updateDependencies) {
@@ -99,7 +106,7 @@ export class ConversionExecutor {
       // 7. CI/CD konfigurációk generálása
       await this.generateCICDFiles();
       
-      this.updateProgress(100, "Konverzió befejezve!");
+      await this.updateProgress(100, "Konverzió befejezve!");
       this.result.success = this.result.errors.length === 0;
       
       return this.result;
@@ -138,7 +145,7 @@ export class ConversionExecutor {
   }
   
   private async analyzeRoutes(): Promise<void> {
-    this.updateProgress(20, "Útvonalak elemzése...");
+    await this.updateProgress(20, "Útvonalak elemzése...");
     
     try {
       // Routes elemzése
@@ -154,7 +161,7 @@ export class ConversionExecutor {
   }
   
   private async transformFiles(): Promise<void> {
-    this.updateProgress(30, "Fájlok transzformálása...");
+    await this.updateProgress(30, "Fájlok transzformálása...");
     
     let modifiedFiles = 0;
     const progressStep = 40 / Math.max(1, this.files.length); // 30-70% között
@@ -168,7 +175,7 @@ export class ConversionExecutor {
         
         // Kihagyása, ha nem kódot tartalmaz
         if (this.shouldSkipFile(file.name)) {
-          this.updateProgress(progressStep, `Kihagyva: ${file.name}`);
+          await this.updateProgress(progressStep, `Kihagyva: ${file.name}`);
           continue;
         }
         
@@ -189,7 +196,7 @@ export class ConversionExecutor {
         this.result.warnings.push(`Hiba a(z) ${file.name} transzformálása közben: ${error instanceof Error ? error.message : String(error)}`);
       }
       
-      this.updateProgress(progressStep, `Feldolgozva: ${file.name}`);
+      await this.updateProgress(progressStep, `Feldolgozva: ${file.name}`);
     }
     
     // Statisztikák frissítése
@@ -249,7 +256,7 @@ export class ConversionExecutor {
   }
 
   private async generateCICDFiles(): Promise<void> {
-    this.updateProgress(90, "CI/CD konfigurációk generálása...");
+    await this.updateProgress(90, "CI/CD konfigurációk generálása...");
     
     try {
       const templates = generateCICDTemplates();
@@ -258,11 +265,13 @@ export class ConversionExecutor {
         if (Array.isArray(template)) {
           // Handle array of templates
           template.forEach(t => {
-            this.result.info.push(
-              `${platform} konfiguráció generálva: ${t.filename}`
-            );
+            if (t && typeof t === 'object' && 'filename' in t) {
+              this.result.info.push(
+                `${platform} konfiguráció generálva: ${t.filename}`
+              );
+            }
           });
-        } else {
+        } else if (template && typeof template === 'object' && 'filename' in template) {
           // Handle single template
           this.result.info.push(
             `${platform} konfiguráció generálva: ${template.filename}`

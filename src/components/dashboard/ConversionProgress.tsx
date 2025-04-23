@@ -14,20 +14,20 @@ interface ConversionProgressProps {
 }
 
 const ConversionProgress = ({ 
-  currentProgress = 67, 
-  currentMessage = "Fájlok feldolgozása..."
+  currentProgress = 0, 
+  currentMessage = "Starting conversion..."
 }: ConversionProgressProps) => {
   const { state } = useConversion();
   const [progress, setProgress] = useState(currentProgress);
   const [message, setMessage] = useState(currentMessage);
   const [activeTab, setActiveTab] = useState("progress");
   const [logs, setLogs] = useState<{text: string, type: 'success' | 'info' | 'pending' | 'error'}[]>([
-    { text: "Projekt struktúra elemzése", type: "success" },
-    { text: "vite.config.js létrehozása", type: "success" },
-    { text: "React Router beállítása", type: "success" },
-    { text: "Oldalak konvertálása route-okra", type: "success" },
-    { text: "Adatlekérési metódusok átalakítása", type: "success" },
-    { text: "Next.js komponensek cseréje...", type: "pending" },
+    { text: "Projekt struktúra elemzése", type: "pending" },
+    { text: "vite.config.js létrehozása", type: "info" },
+    { text: "React Router beállítása", type: "info" },
+    { text: "Oldalak konvertálása route-okra", type: "info" },
+    { text: "Adatlekérési metódusok átalakítása", type: "info" },
+    { text: "Next.js komponensek cseréje", type: "info" },
     { text: "API route-ok konvertálása", type: "info" },
     { text: "package.json frissítése", type: "info" },
   ]);
@@ -57,78 +57,128 @@ const ConversionProgress = ({
   });
 
   useEffect(() => {
-    // Szimuláljuk a valós idejű konverziós folyamatot
-    const interval = setInterval(() => {
-      setProgress(oldProgress => {
-        // Legfeljebb 95%-ig megy, hogy lássuk, hogy még fut
-        if (oldProgress >= 95) {
-          clearInterval(interval);
-          return 95;
-        }
-        return oldProgress + 1;
+    // Update from props
+    setProgress(currentProgress || 0);
+    setMessage(currentMessage || "");
+    
+    // Update progress logs based on current progress
+    updateLogsBasedOnProgress(currentProgress || 0);
+  }, [currentProgress, currentMessage]);
+
+  // Function to update log statuses based on progress
+  const updateLogsBasedOnProgress = (currentProgress: number) => {
+    if (currentProgress >= 5) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[0].type = "success";
+        newLogs[1].type = "pending";
+        return newLogs;
       });
-
-      // Frissítsük az állapotokat a szimuláció során 
-      if (progress > 75 && logs[5].type === "pending") {
-        setLogs(oldLogs => {
-          const newLogs = [...oldLogs];
-          newLogs[5].type = "success";
-          newLogs[6].type = "pending";
-          return newLogs;
-        });
-        setMessage("API route-ok konvertálása...");
-        
-        // Update component conversion stats
-        setStats(oldStats => ({
-          ...oldStats,
-          components: {
-            image: 12,
-            link: 24,
-            head: 8,
-            script: 5,
-            dynamic: 3
-          },
-          convertedFiles: oldStats.convertedFiles + 15,
-        }));
-      } else if (progress > 85 && logs[6].type === "pending") {
-        setLogs(oldLogs => {
-          const newLogs = [...oldLogs];
-          newLogs[6].type = "success";
-          newLogs[7].type = "pending";
-          return newLogs;
-        });
-        setMessage("package.json frissítése...");
-        
-        // Update API routes stats
-        setStats(oldStats => ({
-          ...oldStats,
-          apiRoutes: 6,
-          convertedFiles: oldStats.convertedFiles + 6,
-        }));
-      } else if (progress >= 95 && logs[7].type === "pending") {
-        setLogs(oldLogs => {
-          const newLogs = [...oldLogs];
-          newLogs[7].type = "success";
-          return newLogs;
-        });
-        setMessage("Konverzió befejezve!");
-        
-        // Update dependency stats
-        setStats(oldStats => ({
-          ...oldStats,
-          dependencies: {
-            added: 4,
-            removed: 2,
-            updated: 3
-          },
-          totalFiles: 45,
-          convertedFiles: 42,
-        }));
-      }
-    }, 200);
-
-    return () => clearInterval(interval);
-  }, [progress, logs]);
+    }
+    if (currentProgress >= 20) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[1].type = "success";
+        newLogs[2].type = "pending";
+        return newLogs;
+      });
+      
+      setStats(oldStats => ({
+        ...oldStats,
+        totalFiles: state.projectData?.files?.length || 30,
+      }));
+    }
+    if (currentProgress >= 30) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[2].type = "success";
+        newLogs[3].type = "pending";
+        return newLogs;
+      });
+    }
+    if (currentProgress >= 40) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[3].type = "success";
+        newLogs[4].type = "pending";
+        return newLogs;
+      });
+      
+      setStats(oldStats => ({
+        ...oldStats,
+        convertedFiles: Math.round((oldStats.totalFiles || 30) * 0.3),
+        dataFetching: {
+          getServerSideProps: 4,
+          getStaticProps: 2,
+          getStaticPaths: 1
+        }
+      }));
+    }
+    if (currentProgress >= 60) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[4].type = "success";
+        newLogs[5].type = "pending";
+        return newLogs;
+      });
+      
+      setStats(oldStats => ({
+        ...oldStats,
+        convertedFiles: Math.round((oldStats.totalFiles || 30) * 0.6),
+      }));
+    }
+    if (currentProgress >= 75) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[5].type = "success";
+        newLogs[6].type = "pending";
+        return newLogs;
+      });
+      
+      setStats(oldStats => ({
+        ...oldStats,
+        components: {
+          image: 12,
+          link: 24,
+          head: 8,
+          script: 5,
+          dynamic: 3
+        },
+        convertedFiles: Math.round((oldStats.totalFiles || 30) * 0.75),
+      }));
+    }
+    if (currentProgress >= 85) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[6].type = "success";
+        newLogs[7].type = "pending";
+        return newLogs;
+      });
+      
+      setStats(oldStats => ({
+        ...oldStats,
+        apiRoutes: 6,
+        convertedFiles: Math.round((oldStats.totalFiles || 30) * 0.85),
+      }));
+    }
+    if (currentProgress >= 95) {
+      setLogs(oldLogs => {
+        const newLogs = [...oldLogs];
+        newLogs[7].type = "success";
+        return newLogs;
+      });
+      
+      setStats(oldStats => ({
+        ...oldStats,
+        dependencies: {
+          added: 4,
+          removed: 2,
+          updated: 3
+        },
+        convertedFiles: Math.round((oldStats.totalFiles || 30) * 0.95),
+      }));
+    }
+  };
 
   return (
     <Card>

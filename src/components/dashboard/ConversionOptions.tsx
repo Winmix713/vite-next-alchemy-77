@@ -7,7 +7,7 @@ import type { ConversionOptions as ConversionOptionsType } from "@/types/convers
 
 interface ConversionOptionsProps {
   options: ConversionOptionsType;
-  onOptionToggle: (option: string) => void;
+  onOptionToggle: (option: keyof ConversionOptionsType) => void;
   onStartConversion: () => void;
   isConverting: boolean;
 }
@@ -33,7 +33,7 @@ const ConversionOptions = ({
             <Switch
               id={key}
               checked={value}
-              onCheckedChange={() => onOptionToggle(key)}
+              onCheckedChange={() => onOptionToggle(key as keyof ConversionOptionsType)}
             />
           </div>
         ))}
