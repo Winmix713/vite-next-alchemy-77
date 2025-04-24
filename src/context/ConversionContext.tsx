@@ -68,8 +68,18 @@ const conversionReducer = (state: ConversionState, action: ActionType): Conversi
 export const ConversionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(conversionReducer, initialState);
 
+  const toggleOption = (option: keyof ConversionOptions) => {
+    dispatch({
+      type: 'SET_CONVERSION_OPTIONS',
+      payload: {
+        ...state.conversionOptions,
+        [option]: !state.conversionOptions[option]
+      }
+    });
+  };
+
   return (
-    <ConversionContext.Provider value={{ state, dispatch }}>
+    <ConversionContext.Provider value={{ state, dispatch, toggleOption }}>
       {children}
     </ConversionContext.Provider>
   );

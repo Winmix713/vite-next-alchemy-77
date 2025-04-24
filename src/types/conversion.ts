@@ -1,4 +1,3 @@
-
 export interface ConversionOptions {
   useReactRouter: boolean;
   convertApiRoutes: boolean;
@@ -27,9 +26,9 @@ export interface ConversionState {
 export interface ConversionContextType {
   state: ConversionState;
   dispatch: (action: any) => void;
+  toggleOption: (option: keyof ConversionOptions) => void;
 }
 
-// New interfaces for user accounts, project management and collaboration
 export interface UserProfile {
   id: string;
   email: string;
@@ -94,7 +93,24 @@ export interface Comment {
   replies?: Comment[];
 }
 
-// CICD Integration
+export interface ConversionMetrics {
+  startTime: number;
+  endTime: number;
+  duration: number;
+  filesProcessed: number;
+  filesConverted: number;
+  successRate: number;
+  errorCount: number;
+  warningCount: number;
+}
+
+export interface RouteConversionResult {
+  path: string;
+  isDynamic: boolean;
+  transformedCode: string;
+  appliedTransformations: string[];
+}
+
 export interface CICDIntegration {
   provider: 'github' | 'gitlab' | 'azure' | 'aws' | 'vercel' | 'netlify';
   projectId: string;

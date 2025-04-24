@@ -1,9 +1,10 @@
 
 import { DependencyAnalysis } from '@/types/analyzer';
-import { analyzeDependencies, checkVersionCompatibility } from '../dependencyManager';
+import { DependencyChange } from '@/types/conversion';
+import { processDependencies, checkVersionCompatibility } from '../dependencyManager';
 
-export function analyzeDependencies(packageJson: any): DependencyAnalysis {
-  const dependencies = analyzeDependencies(packageJson);
+export function analyzeDependencyChanges(packageJson: any): DependencyAnalysis {
+  const dependencies = processDependencies(packageJson);
   const compatibility = checkVersionCompatibility(dependencies);
   
   return {

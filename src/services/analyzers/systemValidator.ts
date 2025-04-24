@@ -5,9 +5,9 @@ import { transformCode } from '../codeTransformer';
 
 export async function validateConversionSystem(): Promise<ValidationResult> {
   const components: AnalyzerComponent[] = [
-    { name: 'routeConverter', status: 'ok' },
-    { name: 'codeTransformer', status: 'ok' },
-    { name: 'apiRouteTransformer', status: 'ok' }
+    { name: 'routeConverter', status: 'warning' },
+    { name: 'codeTransformer', status: 'warning' },
+    { name: 'apiRouteTransformer', status: 'warning' }
   ];
   
   const issues: string[] = [];
@@ -15,14 +15,18 @@ export async function validateConversionSystem(): Promise<ValidationResult> {
   try {
     const routeConverterValid = typeof analyzeNextJsRoutes === 'function';
     if (!routeConverterValid) {
-      components[0].status = 'warning';
+      components[0].status = 'error';
       issues.push('RouteConverter validation error');
+    } else {
+      components[0].status = 'ok';
     }
     
     const codeTransformerValid = typeof transformCode === 'function';
     if (!codeTransformerValid) {
-      components[1].status = 'warning';
+      components[1].status = 'error';
       issues.push('CodeTransformer validation error');
+    } else {
+      components[1].status = 'ok';
     }
     
   } catch (error) {

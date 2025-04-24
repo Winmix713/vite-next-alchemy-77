@@ -1,4 +1,3 @@
-
 import { TransformationRule, TransformResult } from '@/types/transformerTypes';
 import { routingTransformationRules } from './transformers/rules/routingRules';
 import { componentTransformationRules } from './transformers/rules/componentRules';
@@ -33,4 +32,16 @@ export function getTransformationsByCategory(category: string): TransformationRu
 
 export function getTransformationsByComplexity(complexity: 'simple' | 'medium' | 'complex'): TransformationRule[] {
   return allTransformationRules.filter(rule => rule.complexity === complexity);
+}
+
+export function getTransformationStats(transformations: TransformResult[]): {
+  total: number;
+  successful: number;
+  failed: number;
+} {
+  return {
+    total: transformations.length,
+    successful: transformations.filter(t => t.appliedTransformations.length > 0).length,
+    failed: transformations.filter(t => t.appliedTransformations.length === 0).length
+  };
 }
