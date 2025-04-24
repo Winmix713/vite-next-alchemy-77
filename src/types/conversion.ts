@@ -1,4 +1,3 @@
-
 export interface ConversionOptions {
   useReactRouter: boolean;
   convertApiRoutes: boolean;
@@ -18,6 +17,10 @@ export interface ConversionState {
     files: File[];
     packageJson?: any;
   };
+  originalCode?: string;
+  convertedCode?: string;
+  conversionResult?: any;
+  conversionError?: string;
 }
 
 export interface ConversionContextType {
