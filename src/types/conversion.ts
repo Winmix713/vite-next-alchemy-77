@@ -1,3 +1,4 @@
+
 export interface ConversionOptions {
   useReactRouter: boolean;
   convertApiRoutes: boolean;
@@ -26,4 +27,92 @@ export interface ConversionState {
 export interface ConversionContextType {
   state: ConversionState;
   dispatch: (action: any) => void;
+}
+
+// New interfaces for user accounts, project management and collaboration
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string;
+  preferences?: UserPreferences;
+  createdAt: number;
+  lastLogin: number;
+}
+
+export interface UserPreferences {
+  defaultConversionOptions: ConversionOptions;
+  defaultTheme: 'light' | 'dark' | 'system';
+  notificationsEnabled: boolean;
+  experimentalFeaturesEnabled: boolean;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  ownerId: string;
+  collaborators?: CollaboratorInfo[];
+  createdAt: number;
+  updatedAt: number;
+  status: 'draft' | 'in_progress' | 'completed' | 'archived';
+  stats?: {
+    filesCount: number;
+    conversionRate: number;
+    lastConversion?: ConversionMetrics;
+  };
+}
+
+export interface CollaboratorInfo {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  role: 'viewer' | 'editor' | 'admin';
+  addedAt: number;
+}
+
+export interface ConversionHistory {
+  id: string;
+  projectId: string;
+  timestamp: number;
+  conversionOptions: ConversionOptions;
+  metrics: ConversionMetrics;
+  userId: string;
+}
+
+export interface Comment {
+  id: string;
+  projectId: string;
+  userId: string;
+  userDisplayName: string;
+  userAvatarUrl?: string;
+  content: string;
+  timestamp: number;
+  filePath?: string;
+  lineNumber?: number;
+  resolved: boolean;
+  replies?: Comment[];
+}
+
+// CICD Integration
+export interface CICDIntegration {
+  provider: 'github' | 'gitlab' | 'azure' | 'aws' | 'vercel' | 'netlify';
+  projectId: string;
+  repositoryUrl: string;
+  branch: string;
+  credentials: {
+    type: 'oauth' | 'token' | 'ssh';
+    value: string;
+  };
+  webhookUrl?: string;
+  lastSync?: number;
+  status: 'connected' | 'disconnected' | 'error';
+}
+
+export interface DeploymentConfig {
+  provider: 'vercel' | 'netlify' | 'aws' | 'github' | 'custom';
+  settings: Record<string, any>;
+  environmentVariables: Record<string, string>;
+  buildCommand?: string;
+  outputDirectory?: string;
 }
