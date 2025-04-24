@@ -35,35 +35,3 @@ export interface RoutingAnalysis {
   dynamicRoutes: number;
   complexRoutes: number;
 }
-
-// New interfaces for statistics and reporting
-export interface ConversionMetrics {
-  startTime: number;
-  endTime: number;
-  duration: number;
-  filesProcessed: number;
-  filesConverted: number;
-  successRate: number;
-  errorCount: number;
-  warningCount: number;
-}
-
-export interface ConversionReport {
-  metrics: ConversionMetrics;
-  summary: string;
-  details: {
-    components: AnalyzerComponent[];
-    routing: RoutingAnalysis;
-    dependencies: DependencyAnalysis;
-    errors: string[];
-    warnings: string[];
-  };
-}
-
-export interface ProjectSnapshot {
-  id: string;
-  name: string;
-  timestamp: number;
-  analysis: CodebaseAnalysis;
-  metrics?: ConversionMetrics;
-}

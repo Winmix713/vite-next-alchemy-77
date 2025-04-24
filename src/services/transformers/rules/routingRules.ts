@@ -1,4 +1,5 @@
-import { TransformationRule } from '@/types/transformerTypes';
+
+import { TransformationRule } from '../types/transformerTypes';
 
 export const routingTransformationRules: TransformationRule[] = [
   {
